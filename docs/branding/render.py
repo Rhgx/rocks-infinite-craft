@@ -63,6 +63,24 @@ def main():
         banner = Image.alpha_composite(banner, title)
         banner.save(ROOT / "banner.png")
 
+        social_blocks = blocks + [
+            "diamond_block", "gold_block", "emerald_block", "redstone_block",
+            "obsidian", "crying_obsidian", "glowstone", "sea_lantern",
+            "pink_terracotta", "blue_ice", "purpur_block", "magma",
+            "warped_planks", "crimson_planks", "honeycomb_block", "bamboo_mosaic",
+        ]
+        random.Random(43).shuffle(social_blocks)
+        social = Image.new("RGBA", (1280, 640))
+        for i, name in enumerate(social_blocks):
+            tile = texture(name).resize((160, 160), Image.Resampling.NEAREST)
+            social.alpha_composite(tile, ((i % 8) * 160, (i // 8) * 160))
+        social = Image.alpha_composite(social, Image.new("RGBA", social.size, (0, 0, 0, 115)))
+        social.save(ROOT / "social-background.png")
+        social_text = Image.open(ROOT / "social-text.png").convert("RGBA")
+        if social_text.size != social.size:
+            raise ValueError("Social preview text must use a 1280 × 640 canvas")
+        Image.alpha_composite(social, social_text).save(ROOT / "social-preview.png")
+
 
 if __name__ == "__main__":
     main()

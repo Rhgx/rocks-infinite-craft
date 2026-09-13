@@ -76,6 +76,20 @@ class DiscoveryCollectionTest {
         var personalReload = new DiscoveryCollection(file, lookup);
         assertTrue(personalReload.owns(1, friend, "RenamedFriend"));
         assertEquals(1, personalReload.entries(rocks, "RenamedRocks").getFirst().id());
+        var originalOutput = pageSnapshot.getFirst().result();
+        assertFalse(personalReload.record(new ItemStack(Items.DIRT), second, originalOutput, "Friend", friend));
+        assertEquals(3, personalReload.entries().size());
+        assertEquals(2, DiscoveryCollection.uniqueResults(personalReload.entries()).size());
+        assertEquals(2, personalReload.outputCount());
+        assertEquals(2, DiscoveryCollection.groupResults(personalReload.entries())
+                .get(new DiscoveryCollection.ResultKey(originalOutput.copyWithCount(12))).size());
+        assertEquals(1, DiscoveryCollection.groupResults(personalReload.entries(rocks, "RenamedRocks"))
+                .get(new DiscoveryCollection.ResultKey(originalOutput)).size());
+        assertFalse(personalReload.record(second, new ItemStack(Items.DIRT), originalOutput, "Friend", friend));
+        assertEquals(3, personalReload.entries().size());
+        assertEquals(1, personalReload.entries(rocks, "RenamedRocks").size());
+        personalReload.save(personalReload.snapshot());
+        assertEquals(3, new DiscoveryCollection(file, lookup).entries().size());
     }
 
     @Test void malformedCollectionIsNeverOverwrittenOnLoad() throws Exception {
@@ -83,5 +97,25 @@ class DiscoveryCollectionTest {
         Files.writeString(file, "not json");
         assertThrows(IOException.class, () -> new DiscoveryCollection(file, lookup));
         assertEquals("not json", Files.readString(file));
+    }
+
+    @Test void queuedSavesCoalesceAndKeepTheLatestSnapshot() throws Exception {
+        var file = directory.resolve("coalesced.json");
+        var collection = new DiscoveryCollection(file, lookup);
+        var jobs = new java.util.ArrayDeque<Runnable>();
+        for (int i = 0; i < 100; i++) {
+            var output = new ItemStack(Items.STONE);
+            output.set(DataComponents.CUSTOM_NAME, Component.literal("Result " + i));
+            collection.record(new ItemStack(Items.STICK), new ItemStack(Items.COAL), output, "Rocks");
+            collection.saveAsync(jobs::add, error -> fail(error));
+        }
+        assertEquals(1, jobs.size());
+        jobs.remove().run();
+        assertEquals(100, new DiscoveryCollection(file, lookup).outputCount());
+        collection.record(new ItemStack(Items.DIRT), new ItemStack(Items.COAL), new ItemStack(Items.DIAMOND), "Rocks");
+        collection.saveAsync(jobs::add, error -> fail(error));
+        assertEquals(1, jobs.size());
+        jobs.remove().run();
+        assertEquals(101, new DiscoveryCollection(file, lookup).outputCount());
     }
 }

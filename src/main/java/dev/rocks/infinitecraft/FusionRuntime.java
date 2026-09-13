@@ -210,8 +210,9 @@ public final class FusionRuntime implements AutoCloseable {
             boolean firstDiscovery = discoveries.record(first, second, output, player.getName().getString(), player.getUUID());
             if (revision == discoveries.revision()) return;
             var snapshot = discoveries.snapshot();
-            if (firstDiscovery && config.milestoneMessages && isMilestone(snapshot.size())) {
-                var milestone = Component.literal(snapshot.size() + " discoveries!")
+            int discoveryCount = firstDiscovery ? discoveries.outputCount() : 0;
+            if (firstDiscovery && config.milestoneMessages && isMilestone(discoveryCount)) {
+                var milestone = Component.literal(discoveryCount + " discoveries!")
                         .withStyle(net.minecraft.ChatFormatting.GOLD, net.minecraft.ChatFormatting.BOLD);
                 for (var viewer : server.getPlayerList().getPlayers()) viewer.sendSystemMessage(milestone);
             }

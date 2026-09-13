@@ -102,6 +102,14 @@ public final class InfiniteCraftMod implements ModInitializer {
                     return 1;
                 }))
                 .then(literal("collection").executes(context -> collection(context, 1))
+                        .then(literal("back").then(argument("page", IntegerArgumentType.integer(1)).executes(context ->
+                                collection(context, IntegerArgumentType.getInteger(context, "page")))))
+                        .then(literal("item").then(argument("item", IntegerArgumentType.integer(1))
+                                .then(argument("returnPage", IntegerArgumentType.integer(1))
+                                .then(argument("recipePage", IntegerArgumentType.integer(1)).executes(context ->
+                                        collection(context, IntegerArgumentType.getInteger(context, "recipePage"),
+                                                IntegerArgumentType.getInteger(context, "item"),
+                                                IntegerArgumentType.getInteger(context, "returnPage")))))))
                         .then(literal("close").executes(context -> {
                             context.getSource().getPlayerOrException().connection.send(
                                     net.minecraft.network.protocol.common.ClientboundClearDialogPacket.INSTANCE);
@@ -163,6 +171,10 @@ public final class InfiniteCraftMod implements ModInitializer {
     }
 
     private int collection(CommandContext<CommandSourceStack> context, int page) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        return collection(context, page, 0, 1);
+    }
+
+    private int collection(CommandContext<CommandSourceStack> context, int page, int itemId, int returnPage) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
         if (runtime == null) return status(context.getSource());
         var player = context.getSource().getPlayerOrException();
         if (!soulboundBook() && !DiscoveryBook.isBook(player.containerMenu.getCarried())
@@ -172,9 +184,16 @@ public final class InfiniteCraftMod implements ModInitializer {
             context.getSource().sendFailure(Component.literal("Craft a Discovery Book."));
             return 0;
         }
-        DiscoveryBook.show(player, runtime.discoveries(player), page);
+        var entries = runtime.discoveries(player);
+        if (itemId > 0) {
+            var selected = entries.stream().filter(entry -> entry.id() == itemId).findFirst();
+            if (selected.isEmpty() || entries.stream().filter(entry -> net.minecraft.world.item.ItemStack.isSameItemSameComponents(
+                    entry.result(), selected.orElseThrow().result())).count() < 2) return 0;
+        }
+        player.openDialog(net.minecraft.core.Holder.direct(DiscoveryBook.createDialog(entries, page, personalBook(), itemId, returnPage)));
         // Send only to the reader so browsing never makes sounds for nearby players.
-        player.connection.send(new net.minecraft.network.protocol.game.ClientboundSoundPacket(
+        if (context.getNodes().stream().noneMatch(node -> node.getNode().getName().equals("back")))
+            player.connection.send(new net.minecraft.network.protocol.game.ClientboundSoundPacket(
                 net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, net.minecraft.sounds.SoundSource.MASTER,
                 player.getX(), player.getEyeY(), player.getZ(), 0.3F, 1.0F, player.getRandom().nextLong()));
         return 1;

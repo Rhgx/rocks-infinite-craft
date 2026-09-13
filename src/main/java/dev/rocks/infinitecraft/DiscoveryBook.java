@@ -40,6 +40,10 @@ public final class DiscoveryBook {
     private static final int PAGE_SIZE = 25;
     private static final int ROW_HEIGHT = 5 * 9 + 8; // Five font lines plus vanilla text-widget padding.
     private static final String EMPTY_ROW = " \n \n \n \n ";
+    private static final net.minecraft.world.item.component.ItemLore SOULBOUND_LORE = new net.minecraft.world.item.component.ItemLore(List.of(
+            Component.literal("Soulbound").withStyle(ChatFormatting.GRAY).withStyle(style -> style.withItalic(false))));
+    private static final net.minecraft.world.item.component.TooltipDisplay SOULBOUND_TOOLTIP =
+            net.minecraft.world.item.component.TooltipDisplay.DEFAULT.withHidden(DataComponents.ENCHANTMENTS, true);
     private static final java.util.Set<java.util.UUID> CREATIVE_CURSOR = new java.util.HashSet<>();
     private DiscoveryBook() {}
 
@@ -98,10 +102,8 @@ public final class DiscoveryBook {
         enchantments.set(registries.lookupOrThrow(net.minecraft.core.registries.Registries.ENCHANTMENT)
                 .getOrThrow(net.minecraft.world.item.enchantment.Enchantments.VANISHING_CURSE), 1);
         stack.set(DataComponents.ENCHANTMENTS, enchantments.toImmutable());
-        stack.set(DataComponents.TOOLTIP_DISPLAY, net.minecraft.world.item.component.TooltipDisplay.DEFAULT
-                .withHidden(DataComponents.ENCHANTMENTS, true));
-        stack.set(DataComponents.LORE, new net.minecraft.world.item.component.ItemLore(List.of(
-                Component.literal("Soulbound").withStyle(ChatFormatting.GRAY).withStyle(style -> style.withItalic(false)))));
+        stack.set(DataComponents.TOOLTIP_DISPLAY, SOULBOUND_TOOLTIP);
+        stack.set(DataComponents.LORE, SOULBOUND_LORE);
         return stack;
     }
 
@@ -136,12 +138,11 @@ public final class DiscoveryBook {
     }
 
     public static void sync(ServerPlayer player) {
-        if (InfiniteCraftMod.soulboundBook()) {
-            var binding = create(player.registryAccess());
+        if (InfiniteCraftMod.soulboundBook() && InfiniteCraftMod.fusionEnabled(player)) {
             java.util.stream.IntStream.concat(Inventory.EQUIPMENT_SLOT_MAPPING.keySet().intStream(),
                     java.util.stream.IntStream.range(0, player.getInventory().getContainerSize())).distinct()
-                    .forEach(slot -> bind(player.getInventory().getItem(slot), binding));
-            bind(player.containerMenu.getCarried(), binding);
+                    .forEach(slot -> bind(player.getInventory().getItem(slot), player.registryAccess()));
+            bind(player.containerMenu.getCarried(), player.registryAccess());
         }
         if (!InfiniteCraftMod.soulboundBook()) {
             forgetCreativeCursor(player.getUUID());
@@ -163,8 +164,15 @@ public final class DiscoveryBook {
         stack.remove(DataComponents.LORE);
     }
 
-    private static void bind(ItemStack stack, ItemStack binding) {
+    static void bind(ItemStack stack, net.minecraft.core.HolderLookup.Provider registries) {
         if (!isBook(stack)) return;
+        var enchantments = stack.getOrDefault(DataComponents.ENCHANTMENTS, net.minecraft.world.item.enchantment.ItemEnchantments.EMPTY);
+        var curse = registries.lookupOrThrow(net.minecraft.core.registries.Registries.ENCHANTMENT)
+                .getOrThrow(net.minecraft.world.item.enchantment.Enchantments.VANISHING_CURSE);
+        if (enchantments.size() == 1 && enchantments.getLevel(curse) == 1
+                && SOULBOUND_LORE.equals(stack.get(DataComponents.LORE))
+                && SOULBOUND_TOOLTIP.equals(stack.get(DataComponents.TOOLTIP_DISPLAY))) return;
+        var binding = create(registries);
         stack.set(DataComponents.ENCHANTMENTS, binding.get(DataComponents.ENCHANTMENTS));
         stack.set(DataComponents.LORE, binding.get(DataComponents.LORE));
         stack.set(DataComponents.TOOLTIP_DISPLAY, binding.get(DataComponents.TOOLTIP_DISPLAY));
@@ -253,29 +261,51 @@ public final class DiscoveryBook {
     }
 
     static net.minecraft.server.dialog.NoticeDialog createDialog(List<DiscoveryCollection.Entry> entries, int requestedPage, boolean personal) {
+        return createDialog(entries, requestedPage, personal, 0, 1);
+    }
+
+    static net.minecraft.server.dialog.NoticeDialog createDialog(List<DiscoveryCollection.Entry> entries, int requestedPage,
+            boolean personal, int itemId, int returnPage) {
+        var groups = DiscoveryCollection.groupResults(entries);
+        var selected = itemId > 0 ? entries.stream().filter(entry -> entry.id() == itemId).findFirst()
+                : Optional.<DiscoveryCollection.Entry>empty();
+        var alternatives = selected.map(entry -> groups.get(new DiscoveryCollection.ResultKey(entry.result()))).orElse(List.of());
+        boolean detail = itemId > 0 && alternatives.size() > 1;
+        entries = detail ? alternatives : groups.values().stream().map(List::getFirst).toList();
         entries = entries.reversed();
         int pages = Math.max(1, (entries.size() + PAGE_SIZE - 1) / PAGE_SIZE);
         int page = Math.max(1, Math.min(requestedPage, pages));
         int start = (page - 1) * PAGE_SIZE;
         List<DialogBody> body = new ArrayList<>();
-        body.add(new PlainMessage(Component.literal(entries.size() + (entries.size() == 1 ? " discovery" : " discoveries")
+        String pageCommand = detail ? "/fusion collection item " + itemId + " " + returnPage + " " : "/fusion collection ";
+        body.add(new PlainMessage(Component.literal(entries.size() + (detail ? (entries.size() == 1 ? " recipe" : " recipes") : (entries.size() == 1 ? " discovery" : " discoveries"))
                 + "  ·  Page " + page + " of " + pages).withStyle(ChatFormatting.GRAY), 320));
         var navigation = new PlainMessage(Component.empty()
-                .append(pageArrow("<", "Previous page", page - 1, page > 1))
+                .append(pageArrow("<", "Previous page", pageCommand + (page - 1), page > 1))
                 .append(Component.literal("       "))
-                .append(pageArrow(">", "Next page", page + 1, page < pages)), 320);
+                .append(pageArrow(">", "Next page", pageCommand + (page + 1), page < pages)), 320);
         body.add(navigation);
         for (int index = start; index < Math.min(entries.size(), start + PAGE_SIZE); index++) {
             var entry = entries.get(index);
             int discoveryId = entry.id() > 0 ? entry.id() : entries.size() - index;
+            int recipeCount = groups.get(new DiscoveryCollection.ResultKey(entry.result())).size();
+            var name = itemName(entry.result(), false).copy();
             var description = Component.empty()
-                    .append(itemName(entry.result(), false))
+                    .append(name)
                     .append(Component.literal("\n\n"))
                     .append(itemName(entry.first(), true))
                     .append(Component.literal(" + ").withStyle(ChatFormatting.GRAY))
                     .append(itemName(entry.second(), true))
                     .append(Component.literal(personal ? "\n\n" : "\n\nBy " + shortText(entry.discoverer(), 24))
                             .withStyle(ChatFormatting.GRAY));
+            if (!detail && recipeCount > 1) {
+                if (!personal) description.append(Component.literal(" · ").withStyle(ChatFormatting.GRAY));
+                description.append(Component.literal("[+" + (recipeCount - 1) + "]").withStyle(style -> style
+                        .withColor(ChatFormatting.AQUA)
+                        .withClickEvent(new ClickEvent.RunCommand("/fusion collection item " + discoveryId + " " + page + " 1"))
+                        .withHoverEvent(new HoverEvent.ShowText(Component.literal("View recipes")))));
+                if (personal) description.append(Component.literal(" · ").withStyle(ChatFormatting.GRAY));
+            }
             if (personal) description.append(Component.literal("[Share]").withStyle(style -> style.withColor(ChatFormatting.GOLD)
                             .withClickEvent(new ClickEvent.RunCommand("/fusion share " + discoveryId))
                             .withHoverEvent(new HoverEvent.ShowText(Component.literal("Share recipe in chat")))));
@@ -291,12 +321,12 @@ public final class DiscoveryBook {
         body.add(navigation);
         var common = new CommonDialogData(Component.literal("Discovery Book").withStyle(style -> style.withColor(0xFFAA00).withItalic(false)),
                 Optional.empty(), true, false, DialogAction.NONE, List.copyOf(body), List.of());
-        var close = new ActionButton(new CommonButtonData(Component.literal("Close"), 150),
-                Optional.of(new StaticAction(new ClickEvent.RunCommand("/fusion collection close"))));
+        var close = new ActionButton(new CommonButtonData(Component.literal(detail ? "Back" : "Close"), 150),
+                Optional.of(new StaticAction(new ClickEvent.RunCommand(detail ? "/fusion collection back " + returnPage : "/fusion collection close"))));
         return new net.minecraft.server.dialog.NoticeDialog(common, close);
     }
 
-    private static Component pageArrow(String glyph, String tooltip, int page, boolean available) {
+    private static Component pageArrow(String glyph, String tooltip, String command, boolean available) {
         return Component.literal("[ ")
                 .append(Component.literal(glyph).withStyle(style -> style.withBold(true)
                         .withColor(available ? ChatFormatting.GOLD : ChatFormatting.DARK_GRAY)))
@@ -304,7 +334,7 @@ public final class DiscoveryBook {
                 .withStyle(style -> style
                 .withColor(available ? ChatFormatting.GRAY : ChatFormatting.DARK_GRAY)
                 .withHoverEvent(new HoverEvent.ShowText(Component.literal(tooltip)))
-                .withClickEvent(available ? new ClickEvent.RunCommand("/fusion collection " + page) : null));
+                .withClickEvent(available ? new ClickEvent.RunCommand(command) : null));
     }
 
     private static Component itemName(ItemStack stack, boolean ingredient) {

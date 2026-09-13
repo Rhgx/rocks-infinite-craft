@@ -59,6 +59,12 @@ class DiscoveryBookTest {
         assertTrue(DiscoveryBook.isBook(craftable));
         assertTrue(craftable.getOrDefault(DataComponents.ENCHANTMENTS, net.minecraft.world.item.enchantment.ItemEnchantments.EMPTY).isEmpty());
         assertTrue(craftable.getOrDefault(DataComponents.LORE, net.minecraft.world.item.component.ItemLore.EMPTY).lines().isEmpty());
+        var rebound = craftable.copy();
+        DiscoveryBook.bind(rebound, lookup);
+        assertTrue(ItemStack.isSameItemSameComponents(output, rebound));
+        var enchantments = rebound.get(DataComponents.ENCHANTMENTS);
+        DiscoveryBook.bind(rebound, lookup);
+        assertSame(enchantments, rebound.get(DataComponents.ENCHANTMENTS));
         var recipeJson = com.google.gson.JsonParser.parseString(java.nio.file.Files.readString(
                 java.nio.file.Path.of("src/main/resources/data/rocks_infinite_craft/recipe/discovery_book.json")));
         var recipe = (net.minecraft.world.item.crafting.ShapelessRecipe) net.minecraft.world.item.crafting.Recipe.CODEC
@@ -179,5 +185,27 @@ class DiscoveryBookTest {
         assertFalse(personalText.getString().contains("By "));
         assertFalse(personalText.getString().contains("OtherName"));
         assertEquals(new net.minecraft.network.chat.ClickEvent.RunCommand("/fusion share 42"), personalText.getSiblings().getLast().getStyle().getClickEvent());
+        assertNull(personalText.getSiblings().getFirst().getStyle().getClickEvent());
+        assertFalse(personalText.getString().contains("[+"));
+        assertEquals("Close", DiscoveryBook.createDialog(List.of(personalEntry), 1, true, 42, 1).action().button().label().getString());
+        var alternative = new DiscoveryCollection.Entry(new ItemStack(Items.STICK), new ItemStack(Items.CHARCOAL),
+                new ItemStack(Items.TORCH), "Friend", 43);
+        var recipes = List.of(personalEntry, alternative);
+        var multiple = ((ItemBody) DiscoveryBook.createDialog(recipes, 1).common().body().get(2)).description().orElseThrow().contents();
+        assertTrue(multiple.getString().endsWith("By OtherName · [+1]"));
+        assertEquals("Torch", multiple.getSiblings().getFirst().getString());
+        assertEquals(0x55FFFF, multiple.getSiblings().getLast().getStyle().getColor().getValue());
+        assertNull(multiple.getSiblings().getFirst().getStyle().getClickEvent());
+        assertInstanceOf(net.minecraft.network.chat.HoverEvent.ShowItem.class,
+                multiple.getSiblings().getFirst().getStyle().getHoverEvent());
+        assertEquals(new net.minecraft.network.chat.ClickEvent.RunCommand("/fusion collection item 42 1 1"),
+                multiple.getSiblings().getLast().getStyle().getClickEvent());
+        assertEquals(1, DiscoveryBook.createDialog(recipes, 1).common().body().stream().filter(ItemBody.class::isInstance).count());
+        var details = DiscoveryBook.createDialog(recipes, 1, true, 42, 2);
+        assertEquals(2, details.common().body().stream().filter(ItemBody.class::isInstance).count());
+        assertEquals("Back", details.action().button().label().getString());
+        var detailJson = Dialog.DIRECT_CODEC.encodeStart(lookup.createSerializationContext(JsonOps.INSTANCE), details).getOrThrow();
+        assertTrue(detailJson.toString().contains("/fusion collection back 2"));
+        assertNotNull(Dialog.DIRECT_CODEC.parse(lookup.createSerializationContext(JsonOps.INSTANCE), detailJson).getOrThrow());
     }
 }
