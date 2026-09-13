@@ -1,0 +1,21 @@
+# Generated files and local runtime data
+.gradle/
+build/
+bin/
+run/
+logs/
+mods/
+
+# Editor files
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+
+# Local credentials and Python caches
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc

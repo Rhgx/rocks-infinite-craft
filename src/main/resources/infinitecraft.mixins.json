@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "package": "dev.rocks.infinitecraft.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "mixins": [
+    "BoundBookMenuMixin",
+    "BoundBookPlayerMixin",
+    "BoundBookCreativeMixin",
+    "FusionDropMixin",
+    "DiscoveryBookRecipeMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

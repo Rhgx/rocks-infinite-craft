@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "package": "dev.rocks.infinitecraft.client.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "DiscoveryItemDisplayMixin",
+    "FusionEnableClickMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": ["minecraft:book", "minecraft:cobblestone"],
+  "result": {
+    "id": "minecraft:knowledge_book",
+    "count": 1,
+    "components": {
+      "minecraft:custom_name": {"text": "Discovery Book", "color": "#FFAA00", "italic": false},
+      "minecraft:max_stack_size": 1,
+      "minecraft:custom_data": {"infinitecraft_discovery_book": true}
+    }
+  }
+}

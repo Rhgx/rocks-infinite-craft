@@ -1,0 +1,6 @@
+{
+  "first": "minecraft:stick",
+  "second": "minecraft:coal",
+  "result": "minecraft:torch",
+  "count": 4
+}
