@@ -25,7 +25,6 @@ public final class RecipeEngine implements AutoCloseable {
     private final ThreadPoolExecutor worker;
     private final Map<String, CompletableFuture<RecipeResult>> pending = new java.util.LinkedHashMap<>();
     private final Map<String, CompletableFuture<Void>> edits = new HashMap<>();
-    private final Map<CompletableFuture<RecipeResult>, String> uncached = new HashMap<>();
     private volatile boolean closed;
     private volatile String activeKey;
 
@@ -82,37 +81,6 @@ public final class RecipeEngine implements AutoCloseable {
         try { worker.execute(() -> generate(key, request, allowed, validator, future)); }
         catch (RejectedExecutionException error) { pending.remove(key); future.completeExceptionally(error); }
         return future.copy();
-    }
-
-    public synchronized CompletableFuture<RecipeResult> resolveUncached(GenerationRequest request, Set<String> allowedOutputs) {
-        return resolveUncached(request, allowedOutputs, result -> true, null);
-    }
-
-    public synchronized CompletableFuture<RecipeResult> resolveUncached(GenerationRequest request, Set<String> allowedOutputs,
-            Predicate<RecipeResult> validator, String failureKey) {
-        if (closed) return CompletableFuture.failedFuture(new IllegalStateException("Recipe engine is closed"));
-        Set<String> allowed = Set.copyOf(allowedOutputs);
-        String key = PairKey.of(request.first(), request.second());
-        if (edits.containsKey(key)) return CompletableFuture.failedFuture(new IllegalStateException("Recipe is being updated"));
-        if (failureKey != null && !(failureKey.startsWith(key + "#") && failureKey.length() > key.length() + 1))
-            throw new IllegalArgumentException("Variant failure key must use the canonical pair prefix");
-        if (failureKey != null && store.isBlocked(failureKey)) return blockedFailure();
-        CompletableFuture<RecipeResult> future = new CompletableFuture<>();
-        uncached.put(future, key);
-        try {
-            worker.execute(() -> {
-                try {
-                    if (!future.isDone()) future.complete(generateCandidate(request, allowed, validator, failureKey, future));
-                } catch (Exception error) { future.completeExceptionally(error); }
-                finally { synchronized (this) { uncached.remove(future); } }
-            });
-        } catch (RejectedExecutionException error) { uncached.remove(future); future.completeExceptionally(error); }
-        return future.copy();
-    }
-
-    public CompletableFuture<RecipeResult> resolveUncached(GenerationRequest request, Set<String> allowedOutputs,
-            String failureKey, Predicate<RecipeResult> validator) {
-        return resolveUncached(request, allowedOutputs, validator, failureKey);
     }
 
     public synchronized CompletableFuture<RecipeResult> resolve(GenerationRequest request,
@@ -251,7 +219,6 @@ public final class RecipeEngine implements AutoCloseable {
                 entry.getValue().cancel(false);
                 return true;
             });
-            uncached.forEach((request, pair) -> { if (pair.equals(key)) request.cancel(false); });
         } catch (RejectedExecutionException error) { future.completeExceptionally(error); }
         return future.copy();
     }
@@ -288,7 +255,5 @@ public final class RecipeEngine implements AutoCloseable {
     public synchronized void cancelPendingGeneration() {
         pending.values().forEach(future -> future.cancel(false));
         pending.clear();
-        uncached.keySet().forEach(future -> future.cancel(false));
-        uncached.clear();
     }
 }

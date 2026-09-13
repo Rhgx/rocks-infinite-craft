@@ -50,6 +50,23 @@ public final class ModConfig {
     public Set<String> excludedIds = Set.of();
     public Set<String> excludedNamespaces = Set.of();
 
+    boolean sameCatalog(ModConfig other) {
+        return allowModdedItems == other.allowModdedItems && excludedIds.equals(other.excludedIds)
+                && excludedNamespaces.equals(other.excludedNamespaces);
+    }
+
+    boolean sameGeneration(ModConfig other) {
+        return provider.equals(other.provider) && enabled == other.enabled && generationEnabled == other.generationEnabled
+                && allowItemData == other.allowItemData && generatedTraits == other.generatedTraits
+                && combineSpecialItems == other.combineSpecialItems && specialResultChance == other.specialResultChance
+                && specialIngredientTriggers == other.specialIngredientTriggers && specialRarity == other.specialRarity
+                && specialEnchantments == other.specialEnchantments && specialPotions == other.specialPotions
+                && specialCustomData == other.specialCustomData && generationAttempts == other.generationAttempts
+                && maxOutputCount == other.maxOutputCount && maxTraits == other.maxTraits
+                && power == other.power && silliness == other.silliness && maxPending == other.maxPending
+                && candidateLimit == other.candidateLimit;
+    }
+
     public static ModConfig load(Path file) throws IOException {
         if (!Files.exists(file)) {
             new ModConfig().save(file);

@@ -10,6 +10,23 @@ import static org.junit.jupiter.api.Assertions.*;
 class ModConfigTest {
     @TempDir Path directory;
 
+    @Test void cosmeticSettingsDoNotInvalidateGenerationOrCatalog() {
+        var original = new ModConfig();
+        var changed = new ModConfig();
+        changed.successSound = false;
+        changed.combiningParticles = false;
+        changed.personalBook = true;
+        changed.soulboundBook = false;
+        changed.queueFeedback = false;
+        assertTrue(original.sameGeneration(changed));
+        assertTrue(original.sameCatalog(changed));
+        changed.maxTraits++;
+        assertFalse(original.sameGeneration(changed));
+        assertTrue(original.sameCatalog(changed));
+        changed.excludedIds = java.util.Set.of("minecraft:stone");
+        assertFalse(original.sameCatalog(changed));
+    }
+
     @Test void savesFeatureTogglesAndEnteredKeyWithoutTemporaryFiles() throws Exception {
         Path file = directory.resolve("infinitecraft.json");
         ModConfig config = new ModConfig();

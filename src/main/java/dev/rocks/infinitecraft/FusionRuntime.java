@@ -11,7 +11,6 @@ import dev.rocks.infinitecraft.engine.RecipeStore;
 import dev.rocks.infinitecraft.provider.RecipeGenerators;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.lang.ref.WeakReference;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -57,17 +56,17 @@ public final class FusionRuntime implements AutoCloseable {
     private record CombiningVisual(ServerLevel world, UUID player, UUID first, UUID second, String recipeKey) {}
     private final Map<UUID, Long> lastRecipeShare = new HashMap<>();
     private final Map<UUID, Long> cooldowns = new HashMap<>();
-    private final Map<PhysicalPair, FailedPair> failedPairs = new HashMap<>();
-    private record PhysicalPair(UUID first, UUID second) {
-        static PhysicalPair of(ItemEntity a, ItemEntity b) {
-            return a.getUUID().compareTo(b.getUUID()) <= 0
-                    ? new PhysicalPair(a.getUUID(), b.getUUID()) : new PhysicalPair(b.getUUID(), a.getUUID());
-        }
+    // Both sides are weak: unloaded drops lose fusion intent, so UUID tombstones are unnecessary.
+    private final Map<ItemEntity, Set<ItemEntity>> failedPairs = new WeakHashMap<>();
+    private record CompatibilityKey(DiscoveryCollection.ResultKey first, DiscoveryCollection.ResultKey second) {}
+    private final Map<CompatibilityKey, Set<String>> compatibility = new LinkedHashMap<>();
+
+    private void rememberFailure(ItemEntity a, ItemEntity b) {
+        failedPairs.computeIfAbsent(a, ignored -> Collections.newSetFromMap(new WeakHashMap<>())).add(b);
     }
-    private record FailedPair(WeakReference<ItemEntity> first, WeakReference<ItemEntity> second) {
-        FailedPair(ItemEntity first, ItemEntity second) {
-            this(new WeakReference<>(first), new WeakReference<>(second));
-        }
+
+    private boolean failed(ItemEntity a, ItemEntity b) {
+        return failedPairs.getOrDefault(a, Set.of()).contains(b) || failedPairs.getOrDefault(b, Set.of()).contains(a);
     }
     private long ticks;
     private long epoch;
@@ -104,18 +103,34 @@ public final class FusionRuntime implements AutoCloseable {
     /** Preserve one synchronized store and export worker across settings changes. */
     public void reconfigure(ModConfig settings) throws IOException {
         ModConfig previous = config;
-        RecipeEngine replacement = createEngine(settings);
+        boolean catalogChanged = !previous.sameCatalog(settings);
+        RecipeEngine replacement = previous.sameGeneration(settings) ? null : createEngine(settings);
         config = settings;
-        try { reloadCatalog(); }
+        try {
+            if (catalogChanged) reloadCatalog();
+            else if (replacement != null) cancelExchanges();
+        }
         catch (IOException | RuntimeException error) {
             config = previous;
-            replacement.close();
+            if (replacement != null) replacement.close();
             throw error;
         }
-        RecipeEngine old = engine;
-        engine = replacement;
-        old.close();
-        for (var player : server.getPlayerList().getPlayers()) DiscoveryBook.sync(player);
+        if (replacement != null) {
+            RecipeEngine old = engine;
+            engine = replacement;
+            old.close();
+        }
+        if (previous.soulboundBook != settings.soulboundBook || previous.enabled != settings.enabled)
+            for (var player : server.getPlayerList().getPlayers()) DiscoveryBook.sync(player);
+    }
+
+    private void cancelExchanges() {
+        epoch++;
+        engine.cancelPendingGeneration();
+        reserved.clear();
+        combining.clear();
+        pending = 0;
+        compatibility.clear();
     }
 
     public void reloadCatalog() throws IOException {
@@ -133,11 +148,7 @@ public final class FusionRuntime implements AutoCloseable {
         potionOptions = nextPotions;
         overrides = Map.copyOf(recipes);
         allowed = eligible;
-        epoch++;
-        engine.cancelPendingGeneration();
-        reserved.clear();
-        combining.clear();
-        pending = 0;
+        cancelExchanges();
         // Cancel physical exchanges from older snapshots without cancelling shared recipe discoveries.
         List<CatalogEntry> export = next;
         exportWorker.execute(() -> {
@@ -209,17 +220,14 @@ public final class FusionRuntime implements AutoCloseable {
             int revision = discoveries.revision();
             boolean firstDiscovery = discoveries.record(first, second, output, player.getName().getString(), player.getUUID());
             if (revision == discoveries.revision()) return;
-            var snapshot = discoveries.snapshot();
             int discoveryCount = firstDiscovery ? discoveries.outputCount() : 0;
             if (firstDiscovery && config.milestoneMessages && isMilestone(discoveryCount)) {
                 var milestone = Component.literal(discoveryCount + " discoveries!")
                         .withStyle(net.minecraft.ChatFormatting.GOLD, net.minecraft.ChatFormatting.BOLD);
                 for (var viewer : server.getPlayerList().getPlayers()) viewer.sendSystemMessage(milestone);
             }
-            exportWorker.execute(() -> {
-                try { discoveries.save(snapshot); }
-                catch (IOException error) { InfiniteCraftMod.LOGGER.error("Could not save discovery collection", error); }
-            });
+            discoveries.saveAsync(exportWorker,
+                    error -> InfiniteCraftMod.LOGGER.error("Could not save discovery collection", error));
             if (firstDiscovery && (isSpecial(output) ? config.specialDiscoveryMessage : config.firstDiscoveryMessage)) {
                 var message = discoveryMessage(output, player.getName().getString(), isSpecial(output));
                 for (var viewer : server.getPlayerList().getPlayers()) viewer.sendSystemMessage(message);
@@ -300,25 +308,12 @@ public final class FusionRuntime implements AutoCloseable {
         if (ticks % config.scanIntervalTicks != 0) return;
         cooldowns.values().removeIf(until -> until <= ticks);
         failedPairs.entrySet().removeIf(entry -> {
-            ItemEntity first = entry.getValue().first.get();
-            ItemEntity second = entry.getValue().second.get();
-            // Keep only UUID suppression when chunks unload; never retain the chunk's entities.
-            // A reloaded physical pair stays suppressed until it is observed separated.
-            for (ServerLevel world : server.getAllLevels()) {
-                if (world.getEntity(entry.getKey().first) instanceof ItemEntity loaded) first = loaded;
-                if (world.getEntity(entry.getKey().second) instanceof ItemEntity loaded) second = loaded;
-            }
-            if (first == null || second == null) return false;
-            if (first != entry.getValue().first.get() || second != entry.getValue().second.get()) {
-                entry.setValue(new FailedPair(first, second));
-            }
-            if (first.getRemovalReason() != null && first.getRemovalReason().shouldDestroy()) return true;
-            if (second.getRemovalReason() != null && second.getRemovalReason().shouldDestroy()) return true;
-            return !first.isRemoved() && !second.isRemoved()
-                    && (first.level() != second.level() || first.distanceToSqr(second) > 0.64);
+            var first = entry.getKey();
+            if (first == null || first.isRemoved()) return true;
+            entry.getValue().removeIf(second -> second.isRemoved() || first.level() != second.level()
+                    || first.distanceToSqr(second) > 0.64);
+            return entry.getValue().isEmpty();
         });
-        // Retain failed identities instead of evicting them into automatic paid retries.
-        if (failedPairs.size() >= 4096) return;
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             if (!enabled() || pending >= config.maxPending) continue;
             ServerLevel world = player.level();
@@ -333,7 +328,7 @@ public final class FusionRuntime implements AutoCloseable {
                 for (int second = first + 1; second < nearby.size(); second++) {
                     ItemEntity b = nearby.get(second);
                     if (eligible(b, player) && a.distanceToSqr(b) <= 0.64
-                            && !failedPairs.containsKey(PhysicalPair.of(a, b))) {
+                            && !failed(a, b)) {
                         request(world, player, a, b);
                         break;
                     }
@@ -349,8 +344,7 @@ public final class FusionRuntime implements AutoCloseable {
     }
 
     private void request(ServerLevel world, ServerPlayer player, ItemEntity a, ItemEntity b) {
-        if (failedPairs.size() >= 4096) return;
-        if (a == b && a.getItem().getCount() < 2) return;
+        if (a == b) return;
         ItemStack first = a.getItem().copy();
         ItemStack second = b.getItem().copy();
         // Only crafted lineage markers count here, not ingredients that merely trigger special generation.
@@ -388,11 +382,9 @@ public final class FusionRuntime implements AutoCloseable {
         String failureKey;
         try { failureKey = hasData ? componentFailureKey(first, second) : ""; }
         catch (RuntimeException error) { deny(world, player, a, b, "Unsupported item data."); return; }
-        boolean needsGeneration = generateVariant ? engine.knownVariant(failureKey).isEmpty() : known == null;
         var saved = generateVariant ? engine.knownVariant(failureKey).orElse(null) : known;
-        Set<String> compatibleIds = hasData ? (needsGeneration ? compatibleOutputs(first, second)
-                : saved != null && allowed.contains(saved.itemId()) && !ItemDataFusion.prepare(BuiltInRegistries.ITEM.getValue(Identifier.parse(saved.itemId()))
-                        .getDefaultInstance(), first, second, false).isEmpty() ? allowed : Set.of()) : allowed;
+        boolean needsGeneration = saved == null;
+        Set<String> compatibleIds = hasData ? compatibleOutputs(first, second, saved) : allowed;
         ItemStack dataFirst = first, dataSecond = second;
         int dataPriority = 0;
         if (compatibleIds.isEmpty()) {
@@ -403,7 +395,7 @@ public final class FusionRuntime implements AutoCloseable {
             dataPriority = firstWins ? 1 : 2;
             dataFirst = firstWins ? first : ItemStack.EMPTY;
             dataSecond = firstWins ? ItemStack.EMPTY : second;
-            compatibleIds = compatibleOutputs(dataFirst, dataSecond);
+            compatibleIds = compatibleOutputs(dataFirst, dataSecond, saved);
         }
         final ItemStack preservedFirst = dataFirst, preservedSecond = dataSecond;
         if (compatibleIds.isEmpty()) {
@@ -460,7 +452,6 @@ public final class FusionRuntime implements AutoCloseable {
                             || a.getOwner() != player || b.getOwner() != player
                             || world.getEntity(a.getUUID()) != a || world.getEntity(b.getUUID()) != b
                             || a.isRemoved() || b.isRemoved() || a.distanceToSqr(b) > 0.64
-                            || a == b && a.getItem().getCount() < 2
                             || a.distanceToSqr(player) > 100 || !ItemStack.matches(first, a.getItem())
                             || !ItemStack.matches(second, b.getItem()) || !allowed.contains(result.itemId())) return;
                     try {
@@ -473,18 +464,29 @@ public final class FusionRuntime implements AutoCloseable {
                         deny(world, player, a, b, "Fusion failed.");
                     }
                     } catch (RuntimeException callbackFailure) {
-                    failedPairs.put(PhysicalPair.of(a, b), new FailedPair(a, b));
+                    rememberFailure(a, b);
                     InfiniteCraftMod.LOGGER.error("Fusion completion could not be processed; pair suppressed", callbackFailure);
                 }
             });
         });
     }
 
-    private Set<String> compatibleOutputs(ItemStack first, ItemStack second) {
-        return catalog.stream().filter(entry -> entry.kind().equals("item") && entry.craftable())
-                .filter(entry -> !ItemDataFusion.prepare(BuiltInRegistries.ITEM.getValue(Identifier.parse(entry.id()))
-                        .getDefaultInstance(), first, second, false).isEmpty())
-                .map(CatalogEntry::id).collect(Collectors.toUnmodifiableSet());
+    private Set<String> compatibleOutputs(ItemStack first, ItemStack second, RecipeResult saved) {
+        if (saved != null) return allowed.contains(saved.itemId()) && compatibleOutput(saved.itemId(), first, second)
+                ? Set.of(saved.itemId()) : Set.of();
+        var key = new CompatibilityKey(new DiscoveryCollection.ResultKey(first), new DiscoveryCollection.ResultKey(second));
+        var cached = compatibility.get(key);
+        if (cached != null) return cached;
+        var result = allowed.stream().filter(id -> compatibleOutput(id, first, second))
+                .collect(Collectors.toUnmodifiableSet());
+        if (compatibility.size() >= 128) compatibility.remove(compatibility.keySet().iterator().next());
+        compatibility.put(key, result);
+        return result;
+    }
+
+    private boolean compatibleOutput(String id, ItemStack first, ItemStack second) {
+        return !ItemDataFusion.prepare(BuiltInRegistries.ITEM.getValue(Identifier.parse(id))
+                .getDefaultInstance(), first, second, false).isEmpty();
     }
 
     private ItemStack outputFor(RecipeResult result, ItemStack first, ItemStack second, ItemStack dataFirst, ItemStack dataSecond) {
@@ -579,8 +581,7 @@ public final class FusionRuntime implements AutoCloseable {
 
     private boolean exchange(ServerLevel world, ItemEntity a, ItemEntity b, RecipeResult result, ServerPlayer player,
             ItemStack dataFirst, ItemStack dataSecond) {
-        boolean sameEntity = a == b;
-        if (a.getItem().isEmpty() || b.getItem().isEmpty() || sameEntity && a.getItem().getCount() < 2) return false;
+        if (a == b || a.getItem().isEmpty() || b.getItem().isEmpty()) return false;
         ItemStack output = outputFor(result, a.getItem(), b.getItem(), dataFirst, dataSecond);
         if (output.isEmpty()) return false;
         var midpoint = a.position().add(b.position()).scale(0.5);
@@ -595,24 +596,24 @@ public final class FusionRuntime implements AutoCloseable {
         ItemStack beforeB = b.getItem().copy();
         // Server-thread exchange: retain entities until the spawn succeeds so rollback is possible.
         try {
-            a.setItem(beforeA.copyWithCount(beforeA.getCount() - (sameEntity ? 2 : 1)));
-            if (!sameEntity) b.setItem(beforeB.copyWithCount(beforeB.getCount() - 1));
+            a.setItem(beforeA.copyWithCount(beforeA.getCount() - 1));
+            b.setItem(beforeB.copyWithCount(beforeB.getCount() - 1));
             for (ItemEntity entity : spawned) {
                 if (!world.addFreshEntity(entity)) {
                     spawned.forEach(ItemEntity::discard);
                     a.setItem(beforeA);
-                    if (!sameEntity) b.setItem(beforeB);
+                    b.setItem(beforeB);
                     return false;
                 }
             }
         } catch (RuntimeException error) {
             spawned.forEach(ItemEntity::discard);
             a.setItem(beforeA);
-            if (!sameEntity) b.setItem(beforeB);
+            b.setItem(beforeB);
             throw error;
         }
         if (a.getItem().isEmpty()) a.discard();
-        if (!sameEntity && b.getItem().isEmpty()) b.discard();
+        if (b.getItem().isEmpty()) b.discard();
         for (ItemEntity entity : spawned) cooldowns.put(entity.getUUID(), ticks + config.cooldownTicks);
         recordDiscovery(beforeA, beforeB, output, player);
         try {
@@ -631,7 +632,7 @@ public final class FusionRuntime implements AutoCloseable {
     }
 
     private void deny(ServerLevel world, ServerPlayer player, ItemEntity a, ItemEntity b, String message) {
-        failedPairs.put(PhysicalPair.of(a, b), new FailedPair(a, b));
+        rememberFailure(a, b);
         if (player.level() != world || server.getPlayerList().getPlayer(player.getUUID()) != player
                 || a.isRemoved() || b.isRemoved() || world.getEntity(a.getUUID()) != a
                 || world.getEntity(b.getUUID()) != b || a.distanceToSqr(b) > .64) return;

@@ -90,14 +90,14 @@ class RecipeEngineTest {
         } finally { release.countDown(); }
     }
 
-    @Test void correctionsCancelUncachedRequestsAndKnownRecipesRespectEdits() throws Exception {
+    @Test void correctionsCancelVariantRequestsAndKnownRecipesRespectEdits() throws Exception {
         RecipeStore store = new RecipeStore(directory.resolve("recipes.json"));
         CountDownLatch started = new CountDownLatch(1), release = new CountDownLatch(1);
         String first = "minecraft:a", second = "minecraft:b";
         try (RecipeEngine engine = new RecipeEngine(store, ignored -> {
             started.countDown(); release.await(); return STONE;
         }, 2)) {
-            var componentRequest = engine.resolveUncached(request(first, second), Set.of("minecraft:stone"));
+            var componentRequest = engine.resolveVariant(request(first, second), Set.of("minecraft:stone"), result -> true, PairKey.of(first, second) + "#components");
             assertTrue(started.await(2, TimeUnit.SECONDS));
             var correction = new RecipeResult("minecraft:stone", 2);
             var edit = engine.setRecipe(second, first, correction, Map.of(), Set.of("minecraft:stone"));
@@ -273,10 +273,10 @@ class RecipeEngineTest {
             assertEquals(1, calls.get()); assertFalse(store.isBlocked(key));
         }
         try (RecipeEngine engine = new RecipeEngine(store, ignored -> STONE, 2)) {
-            assertThrows(ExecutionException.class, () -> engine.resolveUncached(request(first, second), Set.of("minecraft:stone"),
+            assertThrows(ExecutionException.class, () -> engine.resolveVariant(request(first, second), Set.of("minecraft:stone"),
                     recipe -> { throw new java.util.concurrent.CancellationException(); }, key + "#cancelled").get(2, TimeUnit.SECONDS));
             assertFalse(store.isBlocked(key + "#cancelled"));
-            assertThrows(ExecutionException.class, () -> engine.resolveUncached(request(first, second), Set.of("minecraft:stone"),
+            assertThrows(ExecutionException.class, () -> engine.resolveVariant(request(first, second), Set.of("minecraft:stone"),
                     recipe -> false, key + "#variant").get(2, TimeUnit.SECONDS));
             assertTrue(store.isBlocked(key + "#variant")); assertFalse(store.isBlocked(key));
             assertEquals(STONE, engine.resolve(request(first, second), Map.of()).get(2, TimeUnit.SECONDS));
