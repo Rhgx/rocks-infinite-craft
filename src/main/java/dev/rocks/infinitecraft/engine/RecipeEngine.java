@@ -13,8 +13,10 @@ import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /** Resolves recipes off the game thread. The caller still validates live game state. */
@@ -24,9 +26,10 @@ public final class RecipeEngine implements AutoCloseable {
     private final int generationAttempts;
     private final ThreadPoolExecutor worker;
     private final Map<String, CompletableFuture<RecipeResult>> pending = new java.util.LinkedHashMap<>();
+    private final Map<String, Future<?>> tasks = new HashMap<>();
     private final Map<String, CompletableFuture<Void>> edits = new HashMap<>();
+    private final Set<String> activeKeys = new java.util.HashSet<>();
     private volatile boolean closed;
-    private volatile String activeKey;
 
     public record QueuePosition(int position, int total) {}
 
@@ -34,7 +37,7 @@ public final class RecipeEngine implements AutoCloseable {
     public synchronized QueuePosition queuePosition(String key) {
         int position = 0, total = 0;
         for (var entry : pending.entrySet()) {
-            if (entry.getValue().isDone() || entry.getKey().equals(activeKey)) continue;
+            if (entry.getValue().isDone() || activeKeys.contains(entry.getKey())) continue;
             total++;
             if (entry.getKey().equals(key)) position = total;
         }
@@ -42,18 +45,25 @@ public final class RecipeEngine implements AutoCloseable {
     }
 
     public RecipeEngine(RecipeStore store, RecipeGenerator generator, int maxQueued) {
-        this(store, generator, maxQueued, 3);
+        this(store, generator, maxQueued, 3, 1);
     }
 
     public RecipeEngine(RecipeStore store, RecipeGenerator generator, int maxQueued, int generationAttempts) {
+        this(store, generator, maxQueued, generationAttempts, 1);
+    }
+
+    public RecipeEngine(RecipeStore store, RecipeGenerator generator, int maxQueued, int generationAttempts,
+            int generationThreads) {
         if (maxQueued < 1) throw new IllegalArgumentException("maxQueued must be positive");
         if (generationAttempts < 1 || generationAttempts > 4) throw new IllegalArgumentException("generationAttempts must be between 1 and 4");
+        if (generationThreads < 1 || generationThreads > 8) throw new IllegalArgumentException("generationThreads must be between 1 and 8");
         this.generationAttempts = generationAttempts;
         this.store = store;
         this.generator = generator;
-        worker = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS,
+        AtomicInteger threadNumber = new AtomicInteger();
+        worker = new ThreadPoolExecutor(generationThreads, generationThreads, 0, TimeUnit.MILLISECONDS,
                 new ArrayBlockingQueue<>(maxQueued), runnable -> {
-                    Thread thread = new Thread(runnable, "infinite-craft-recipes");
+                    Thread thread = new Thread(runnable, "infinite-craft-recipes-" + threadNumber.incrementAndGet());
                     thread.setDaemon(true);
                     return thread;
                 });
@@ -78,7 +88,7 @@ public final class RecipeEngine implements AutoCloseable {
         if (existing != null) return existing.thenApply(result -> validate(result, allowed));
         var future = new CompletableFuture<RecipeResult>();
         pending.put(key, future);
-        try { worker.execute(() -> generate(key, request, allowed, validator, future)); }
+        try { tasks.put(key, worker.submit(() -> generate(key, request, allowed, validator, future))); }
         catch (RejectedExecutionException error) { pending.remove(key); future.completeExceptionally(error); }
         return future.copy();
     }
@@ -107,7 +117,7 @@ public final class RecipeEngine implements AutoCloseable {
         CompletableFuture<RecipeResult> future = new CompletableFuture<>();
         pending.put(key, future);
         try {
-            worker.execute(() -> generate(key, request, allowed, validator, future));
+            tasks.put(key, worker.submit(() -> generate(key, request, allowed, validator, future)));
         } catch (RejectedExecutionException exception) {
             pending.remove(key);
             future.completeExceptionally(exception);
@@ -118,7 +128,7 @@ public final class RecipeEngine implements AutoCloseable {
 
     private void generate(String key, GenerationRequest request, Set<String> allowed, Predicate<RecipeResult> validator,
             CompletableFuture<RecipeResult> future) {
-        activeKey = key;
+        synchronized (this) { activeKeys.add(key); }
         try {
             if (future.isDone() || closed) return;
             RecipeResult result = generateCandidate(request, allowed, validator, key, future);
@@ -136,7 +146,22 @@ public final class RecipeEngine implements AutoCloseable {
                 future.completeExceptionally(exception);
             }
         } finally {
-            activeKey = null;
+            synchronized (this) {
+                activeKeys.remove(key);
+                tasks.remove(key);
+            }
+        }
+    }
+
+    /** Cancels one generated recipe. Callers must first ensure no other exchange still needs it. */
+    public synchronized void cancelRecipe(String key) {
+        CompletableFuture<RecipeResult> future = pending.remove(key);
+        if (future == null) return;
+        future.cancel(false);
+        Future<?> task = tasks.remove(key);
+        if (task != null) {
+            task.cancel(true);
+            if (task instanceof Runnable runnable) worker.remove(runnable);
         }
     }
 
@@ -255,5 +280,8 @@ public final class RecipeEngine implements AutoCloseable {
     public synchronized void cancelPendingGeneration() {
         pending.values().forEach(future -> future.cancel(false));
         pending.clear();
+        tasks.values().forEach(task -> task.cancel(true));
+        tasks.values().stream().filter(Runnable.class::isInstance).map(Runnable.class::cast).forEach(worker::remove);
+        tasks.clear();
     }
 }

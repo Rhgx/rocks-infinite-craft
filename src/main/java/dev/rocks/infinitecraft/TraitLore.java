@@ -34,7 +34,7 @@ final class TraitLore {
         }
         for (String mode : activations.values()) {
             String hint = switch (mode) {
-                case "consumed" -> "Edible";
+                case "consumed", "consumed_brief", "consumed_long", "consumed_intense" -> "Edible";
                 case "head", "chest", "legs", "feet" -> "Wearable";
                 case "offhand" -> "Offhand";
                 default -> "";

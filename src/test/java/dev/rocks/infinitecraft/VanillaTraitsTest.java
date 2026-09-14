@@ -76,6 +76,12 @@ class VanillaTraitsTest {
                 eaten.get(DataComponents.CONSUMABLE).onConsumeEffects().getFirst();
         assertEquals(400, effect.effects().getFirst().getDuration());
         assertEquals(2, effect.effects().getFirst().getAmplifier());
+        var intense = VanillaTraits.apply(stick, List.of("speedy"), "", java.util.Map.of("speedy", 1.0),
+                java.util.Map.of("speedy", "consumed_intense"), plain);
+        var intenseEffect = (net.minecraft.world.item.consume_effects.ApplyStatusEffectsConsumeEffect)
+                intense.get(DataComponents.CONSUMABLE).onConsumeEffects().getFirst();
+        assertEquals(160, intenseEffect.effects().getFirst().getDuration());
+        assertEquals(3, intenseEffect.effects().getFirst().getAmplifier());
         assertFalse(ItemDataFusion.prepare(new ItemStack(Items.DIAMOND), eaten, stick, false).isEmpty());
         var heldAgain = VanillaTraits.apply(eaten, List.of("speedy"), "", java.util.Map.of(),
                 java.util.Map.of("speedy", "mainhand"), plain);
@@ -164,10 +170,12 @@ class VanillaTraitsTest {
     @Test void modifiersPreserveNativeWeaponAttributesAndDoNotStackOnReapply() {
         var base = new ItemStack(Items.IRON_SWORD);
         var original = base.getOrDefault(DataComponents.ATTRIBUTE_MODIFIERS, ItemAttributeModifiers.EMPTY);
-        var output = VanillaTraits.apply(base, List.of("strong", "speedy", "low_gravity"), null);
+        var output = VanillaTraits.apply(base, List.of("strong", "attack_speed", "speedy", "low_gravity"), null);
         var modifiers = output.get(DataComponents.ATTRIBUTE_MODIFIERS);
         assertTrue(modifiers.modifiers().containsAll(original.modifiers()));
-        assertEquals(original.modifiers().size() + 3, modifiers.modifiers().size());
+        assertEquals(original.modifiers().size() + 4, modifiers.modifiers().size());
+        assertEquals(original.compute(Attributes.ATTACK_SPEED, 4, EquipmentSlot.MAINHAND) + 2,
+                modifiers.compute(Attributes.ATTACK_SPEED, 4, EquipmentSlot.MAINHAND), .00001);
         assertEquals(.04, modifiers.compute(Attributes.GRAVITY, .08, EquipmentSlot.MAINHAND), .00001);
         assertEquals(original, base.get(DataComponents.ATTRIBUTE_MODIFIERS));
         assertEquals(modifiers.modifiers().size(), VanillaTraits.apply(output, List.of("strong"), null)

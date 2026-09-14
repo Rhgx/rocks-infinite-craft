@@ -58,6 +58,7 @@ class ModConfigTest {
         config.specialIngredientTriggers = false;
         config.combiningParticles = false;
         config.generationAttempts = 4;
+        config.generationThreads = 3;
         config.maxOutputCount = 32;
         config.power = 90;
         config.silliness = 10;
@@ -93,6 +94,7 @@ class ModConfigTest {
         assertFalse(loaded.specialIngredientTriggers);
         assertFalse(loaded.combiningParticles);
         assertEquals(4, loaded.generationAttempts);
+        assertEquals(3, loaded.generationThreads);
         assertEquals(32, loaded.maxOutputCount);
         assertEquals(90, loaded.power);
         assertEquals(10, loaded.silliness);

@@ -37,6 +37,11 @@ final class InfiniteCraftConfigScreen {
         general.addEntry(entries.startTextDescription(Component.literal("Fusion").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD)).build());
         general.addEntry(entries.startBooleanToggle(Component.literal("Enable item fusion"), config.enabled)
                 .setDefaultValue(true).setSaveConsumer(value -> config.enabled = value).build());
+        general.addEntry(entries.startBooleanToggle(Component.literal("Ground fusion"), config.groundFusion)
+                .setDefaultValue(true).setSaveConsumer(value -> config.groundFusion = value).build());
+        general.addEntry(entries.startBooleanToggle(Component.literal("Fusion Crafter"), config.crafterFusion)
+                .setDefaultValue(true).setTooltip(Component.literal("Fuses items placed in two Crafter slots."))
+                .setSaveConsumer(value -> config.crafterFusion = value).build());
         general.addEntry(entries.startBooleanToggle(Component.literal("Allow modded items"), config.allowModdedItems)
                 .setDefaultValue(true).setSaveConsumer(value -> config.allowModdedItems = value).build());
         general.addEntry(entries.startBooleanToggle(Component.literal("Item data fusion"), config.allowItemData)
@@ -183,6 +188,10 @@ final class InfiniteCraftConfigScreen {
         limits.addEntry(timeout);
         limits.addEntry(entries.startIntField(Component.literal("Generation attempts"), config.generationAttempts)
                 .setDefaultValue(3).setMin(1).setMax(4).setSaveConsumer(value -> config.generationAttempts = value).build());
+        limits.addEntry(entries.startIntField(Component.literal("Generation threads"), config.generationThreads)
+                .setDefaultValue(1).setMin(1).setMax(8)
+                .setTooltip(Component.literal("Recipes that may generate at the same time."))
+                .setSaveConsumer(value -> config.generationThreads = value).build());
         var endpointHeader = entries.startTextDescription(Component.literal("Connection overrides").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD)).build();
         endpointHeader.setDisplayRequirement(http::get);
         limits.addEntry(endpointHeader);

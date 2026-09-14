@@ -182,6 +182,28 @@ class RecipeEngineTest {
         }
     }
 
+    @Test void configuredWorkersRunConcurrentlyAndCancelledRecipesReleaseTheirWorker() throws Exception {
+        CountDownLatch bothStarted = new CountDownLatch(2), release = new CountDownLatch(1), wasInterrupted = new CountDownLatch(1);
+        AtomicInteger interrupted = new AtomicInteger();
+        try (RecipeEngine engine = new RecipeEngine(new RecipeStore(directory.resolve("recipes.json")), request -> {
+            bothStarted.countDown();
+            try { release.await(); }
+            catch (InterruptedException error) { interrupted.incrementAndGet(); wasInterrupted.countDown(); throw error; }
+            return STONE;
+        }, 4, 3, 2)) {
+            String firstKey = PairKey.of("minecraft:a", "minecraft:b");
+            var first = engine.resolve(request("minecraft:a", "minecraft:b"), Map.of());
+            var second = engine.resolve(request("minecraft:c", "minecraft:d"), Map.of());
+            assertTrue(bothStarted.await(2, TimeUnit.SECONDS));
+            engine.cancelRecipe(firstKey);
+            assertThrows(java.util.concurrent.CompletionException.class, first::join);
+            assertTrue(wasInterrupted.await(2, TimeUnit.SECONDS));
+            assertEquals(1, interrupted.get());
+            release.countDown();
+            assertEquals(STONE, second.get(2, TimeUnit.SECONDS));
+        } finally { release.countDown(); }
+    }
+
     @Test void invalidGenerationIsNotCachedAndMayBeRetried() throws Exception {
         AtomicInteger calls = new AtomicInteger();
         RecipeStore store = new RecipeStore(directory.resolve("recipes.json"));

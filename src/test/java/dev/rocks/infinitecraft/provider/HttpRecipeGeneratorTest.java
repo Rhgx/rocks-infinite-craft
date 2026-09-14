@@ -44,6 +44,11 @@ class HttpRecipeGeneratorTest {
 
         assertThrows(InvalidRecipeResponseException.class, () -> candidates(dyed.replace("#4A8BFF", "blue"), limited));
         assertThrows(InvalidRecipeResponseException.class, () -> candidates(dyed.replace("[\"speedy\"]", "[\"speedy\",\"bouncy\"]"), limited));
+        String intense = "{\"itemId\":\"minecraft:cobblestone\",\"traits\":[\"speedy\"],\"activations\":{\"speedy\":\"consumed_intense\"}}";
+        assertThrows(InvalidRecipeResponseException.class, () -> candidates(intense, request));
+        var rare = new GenerationRequest(request.first(), request.second(), request.candidates(), request.supportedTraits(),
+                List.of(), 12, 100, 100, Map.of(), 3, List.of(), 75);
+        assertEquals("consumed_intense", candidates(intense, rare).getFirst().activations().get("speedy"));
 
     }
 

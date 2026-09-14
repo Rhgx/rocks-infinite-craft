@@ -31,6 +31,8 @@ public final class TraitRegistry {
             new LongReachTrait(),
             new AttributeTrait("strong", new StrengthRange(0, 6, 3),
                     () -> Attributes.ATTACK_DAMAGE, ADD, () -> MobEffects.STRENGTH),
+            new AttributeTrait("attack_speed", new StrengthRange(0, 4, 2),
+                    () -> Attributes.ATTACK_SPEED, ADD),
             new AttributeTrait("giant", new StrengthRange(0, 1, .5),
                     () -> Attributes.SCALE, INCREASE_FRACTION),
             new AttributeTrait("leaping", new StrengthRange(0, .6, .3),

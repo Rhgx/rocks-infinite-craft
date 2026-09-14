@@ -37,7 +37,7 @@ public record AttributeTrait(
 
     @Override public List<String> activationModes() {
         var modes = new ArrayList<>(List.of("auto", "mainhand", "offhand", "head", "chest", "legs", "feet"));
-        if (consumedEffect != null) modes.add("consumed");
+        if (consumedEffect != null) modes.addAll(List.of("consumed", "consumed_brief", "consumed_long", "consumed_intense"));
         return List.copyOf(modes);
     }
 
@@ -68,7 +68,7 @@ public record AttributeTrait(
     }
 
     @Override public void apply(ItemStack output, double value, String activation) {
-        if (activation.equals("consumed")) {
+        if (activation.startsWith("consumed")) {
             if (consumedEffect == null) throw new IllegalArgumentException("No consumed form for this trait");
             var modifiers = output.getOrDefault(DataComponents.ATTRIBUTE_MODIFIERS, ItemAttributeModifiers.EMPTY);
             var modifierId = Identifier.fromNamespaceAndPath("infinitecraft", id);
@@ -79,9 +79,16 @@ public record AttributeTrait(
                 public String id() { return AttributeTrait.this.id; }
                 protected ConsumeEffect effect(double ignored) {
                     double fraction = (value - range.minimum()) / (range.maximum() - range.minimum());
+                    int duration = switch (activation) {
+                        case "consumed_brief" -> 200;
+                        case "consumed_long" -> 1200;
+                        case "consumed_intense" -> 160;
+                        default -> 400;
+                    };
+                    int amplifier = activation.equals("consumed_intense") ? 3
+                            : Math.min(2, (int) Math.floor(fraction * 3));
                     return new ApplyStatusEffectsConsumeEffect(
-                            new MobEffectInstance(consumedEffect.get(), 400,
-                                    Math.min(2, (int) Math.floor(fraction * 3))));
+                            new MobEffectInstance(consumedEffect.get(), duration, amplifier));
                 }
                 protected boolean replaces(ConsumeEffect effect) {
                     return effect instanceof ApplyStatusEffectsConsumeEffect status

@@ -14,6 +14,8 @@ public final class ModConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     public ProviderConfig provider = ProviderConfig.defaults();
     public boolean enabled = true;
+    public boolean groundFusion = true;
+    public boolean crafterFusion = true;
     public boolean joinMessage = true;
     public boolean firstDiscoveryMessage = true;
     public boolean specialDiscoveryMessage = true;
@@ -38,6 +40,7 @@ public final class ModConfig {
     public boolean specialCustomData = true;
     public boolean combiningParticles = true;
     public int generationAttempts = 3;
+    public int generationThreads = 1;
     public int maxOutputCount = 8;
     public int maxTraits = 3;
     public int power = 50;
@@ -62,6 +65,7 @@ public final class ModConfig {
                 && specialIngredientTriggers == other.specialIngredientTriggers && specialRarity == other.specialRarity
                 && specialEnchantments == other.specialEnchantments && specialPotions == other.specialPotions
                 && specialCustomData == other.specialCustomData && generationAttempts == other.generationAttempts
+                && generationThreads == other.generationThreads
                 && maxOutputCount == other.maxOutputCount && maxTraits == other.maxTraits
                 && power == other.power && silliness == other.silliness && maxPending == other.maxPending
                 && candidateLimit == other.candidateLimit;
@@ -94,6 +98,7 @@ public final class ModConfig {
         if (scanIntervalTicks < 1 || scanIntervalTicks > 200 || maxNearbyItems < 2 || maxNearbyItems > 256
                 || maxPending < 1 || maxPending > 64 || candidateLimit < 1 || candidateLimit > 256
                 || cooldownTicks < 20 || cooldownTicks > 12000 || generationAttempts < 1 || generationAttempts > 4
+                || generationThreads < 1 || generationThreads > 8
                 || power < 0 || power > 100 || silliness < 0 || silliness > 100
                 || maxTraits < 0 || maxTraits > 8
                 || maxOutputCount < 1 || maxOutputCount > 64
