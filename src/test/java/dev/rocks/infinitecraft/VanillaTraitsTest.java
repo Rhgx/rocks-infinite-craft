@@ -186,6 +186,21 @@ class VanillaTraitsTest {
         var reach = VanillaTraits.apply(base, List.of("long_reach"), null);
         assertNotNull(reach.get(DataComponents.ATTACK_RANGE));
         assertEquals(reach.get(DataComponents.ATTACK_RANGE), VanillaTraits.apply(reach, List.of("long_reach"), null).get(DataComponents.ATTACK_RANGE));
+
+        var added = java.util.Map.of(
+                "tough", Attributes.ARMOR_TOUGHNESS,
+                "healthy", Attributes.MAX_HEALTH,
+                "soft_landing", Attributes.SAFE_FALL_DISTANCE,
+                "gilled", Attributes.OXYGEN_BONUS,
+                "sweeping", Attributes.SWEEPING_DAMAGE_RATIO);
+        for (var entry : added.entrySet()) {
+            var trait = dev.rocks.infinitecraft.traits.TraitRegistry.get(entry.getKey());
+            var item = VanillaTraits.apply(new ItemStack(Items.STICK), List.of(entry.getKey()), null,
+                    java.util.Map.of(entry.getKey(), 1.0), java.util.Map.of(), dev.rocks.infinitecraft.core.NameStyle.PLAIN);
+            var value = item.get(DataComponents.ATTRIBUTE_MODIFIERS)
+                    .compute(entry.getValue(), entry.getValue().value().getDefaultValue(), EquipmentSlot.MAINHAND);
+            assertEquals(entry.getValue().value().getDefaultValue() + trait.range().maximum(), value, .00001, entry.getKey());
+        }
     }
 
     @Test void equipmentUsesActualSlotAndGliderCannotReplaceBootSlot() {
