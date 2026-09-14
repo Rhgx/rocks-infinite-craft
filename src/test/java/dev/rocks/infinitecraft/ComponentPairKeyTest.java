@@ -20,5 +20,10 @@ class ComponentPairKeyTest {
             sawSecond |= !firstWins;
         }
         assertTrue(sawFirst && sawSecond);
+        var base = new dev.rocks.infinitecraft.core.RecipeResult("minecraft:stone", 1);
+        var variant = new dev.rocks.infinitecraft.core.RecipeResult("minecraft:diamond", 1);
+        assertSame(variant, FusionRuntime.cachedVariantOrBase(variant, base, ignored -> false));
+        assertSame(base, FusionRuntime.cachedVariantOrBase(null, base, ignored -> true));
+        assertNull(FusionRuntime.cachedVariantOrBase(null, base, ignored -> false));
     }
 }

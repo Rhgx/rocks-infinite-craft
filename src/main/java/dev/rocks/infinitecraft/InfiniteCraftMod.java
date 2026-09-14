@@ -23,6 +23,39 @@ import static net.minecraft.commands.Commands.literal;
 public final class InfiniteCraftMod implements ModInitializer {
     public static final Logger LOGGER = LoggerFactory.getLogger("Rocks' Infinite Craft");
     private static FusionRuntime runtime;
+    private static final java.util.Map<java.util.UUID, String> discoverySearches = new java.util.HashMap<>();
+
+    private static final java.util.Set<net.minecraft.world.level.block.entity.CrafterBlockEntity> loadedCrafters =
+            java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+
+    public static boolean fusionInputSlot(int slot) { return FusionCrafter.inputSlot(slot); }
+
+    public static net.minecraft.world.item.ItemStack crafterPreview(net.minecraft.world.level.block.entity.CrafterBlockEntity block) {
+        return runtime == null ? net.minecraft.world.item.ItemStack.EMPTY : runtime.crafterPreview(block);
+    }
+
+    public static void crafterChanged(net.minecraft.world.level.block.entity.BlockEntity block) {
+        if (runtime != null && block.getLevel() instanceof net.minecraft.server.level.ServerLevel
+                && block instanceof net.minecraft.world.level.block.entity.CrafterBlockEntity crafter && FusionCrafter.marked(crafter))
+            runtime.touchCrafter(crafter);
+    }
+
+    public static void crafterPlaced(net.minecraft.world.level.block.entity.CrafterBlockEntity block,
+            net.minecraft.world.entity.LivingEntity placer) {
+        if (placer instanceof net.minecraft.server.level.ServerPlayer player && FusionCrafter.marked(block))
+            FusionCrafter.setOwner(block, player.getUUID());
+    }
+
+    public static void triggerCrafter(net.minecraft.world.level.block.entity.CrafterBlockEntity block) {
+        if (runtime != null && FusionCrafter.marked(block)) runtime.triggerCrafter(block);
+    }
+
+    public static boolean isFusionCrafter(net.minecraft.world.level.block.entity.BlockEntity block) {
+        return block instanceof net.minecraft.world.level.block.entity.CrafterBlockEntity crafter && FusionCrafter.marked(crafter);
+    }
+    static boolean groundFusionEnabled() {
+        return runtime != null && runtime.enabled() && runtime.settings().groundFusion;
+    }
 
     static boolean fusionEnabled(net.minecraft.server.level.ServerPlayer player) {
         return runtime != null && runtime.enabled();
@@ -45,11 +78,42 @@ public final class InfiniteCraftMod implements ModInitializer {
     }
 
     @Override public void onInitialize() {
+        SpecialItemsTab.initialize();
+        DiscoveryScreenPayload.initialize();
+        net.fabricmc.fabric.api.event.lifecycle.v1.ServerBlockEntityEvents.BLOCK_ENTITY_LOAD.register((block, world) -> {
+            if (block instanceof net.minecraft.world.level.block.entity.CrafterBlockEntity crafter) {
+                // Components may not be loaded yet; the runtime checks the marker at the next server tick.
+                loadedCrafters.add(crafter);
+                if (runtime != null) runtime.touchCrafter(crafter);
+            }
+        });
+        net.fabricmc.fabric.api.event.lifecycle.v1.ServerBlockEntityEvents.BLOCK_ENTITY_UNLOAD.register((block, world) -> {
+            if (block instanceof net.minecraft.world.level.block.entity.CrafterBlockEntity crafter) {
+                loadedCrafters.remove(crafter);
+                if (runtime != null) runtime.unloadCrafter(crafter);
+            }
+        });
+        net.fabricmc.fabric.api.event.player.UseBlockCallback.EVENT.register((player, world, hand, hit) -> {
+            if (runtime != null && player instanceof net.minecraft.server.level.ServerPlayer serverPlayer
+                    && world.getBlockEntity(hit.getBlockPos()) instanceof net.minecraft.world.level.block.entity.CrafterBlockEntity block
+                    && FusionCrafter.marked(block)) runtime.crafterUser(block, serverPlayer);
+            return net.minecraft.world.InteractionResult.PASS;
+        });
+        net.fabricmc.fabric.api.loot.v3.LootTableEvents.MODIFY.register((key, builder, source, registries) -> {
+            if (key.identifier().equals(net.minecraft.resources.Identifier.withDefaultNamespace("blocks/crafter")))
+                builder.apply(net.minecraft.world.level.storage.loot.functions.CopyComponentsFunction.copyComponentsFromBlockEntity(
+                        net.minecraft.world.level.storage.loot.parameters.LootContextParams.BLOCK_ENTITY)
+                        .include(net.minecraft.core.component.DataComponents.CUSTOM_DATA)
+                        .include(net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA)
+                        .include(net.minecraft.core.component.DataComponents.CUSTOM_NAME)
+                        .include(net.minecraft.core.component.DataComponents.LORE));
+        });
         DiscoveryBook.initialize(player -> runtime == null ? java.util.List.of() : runtime.discoveries(player));
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             try {
                 ModConfig config = ModConfig.load(FabricLoader.getInstance().getConfigDir().resolve("infinitecraft.json"));
                 runtime = new FusionRuntime(server, config);
+                loadedCrafters.forEach(runtime::touchCrafter);
                 LOGGER.info("Infinite Craft ready: {}", runtime.status());
             } catch (Exception error) {
                 LOGGER.error("Infinite Craft disabled: initialization failed. Check config and world recipe data.", error);
@@ -64,6 +128,7 @@ public final class InfiniteCraftMod implements ModInitializer {
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
             if (runtime != null) runtime.close();
             runtime = null;
+            loadedCrafters.clear();
         });
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             if (runtime == null) return;
@@ -74,10 +139,14 @@ public final class InfiniteCraftMod implements ModInitializer {
         });
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
             DiscoveryBook.sync(handler.player);
-            if (runtime != null) runtime.welcome(handler.player);
+            if (runtime != null) {
+                SpecialItemsTab.send(handler.player, runtime.discoveries());
+                runtime.welcome(handler.player);
+            }
         });
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
             DiscoveryBook.forgetCreativeCursor(handler.player.getUUID());
+            discoverySearches.remove(handler.player.getUUID());
         });
         CommandRegistrationCallback.EVENT.register((dispatcher, access, environment) -> dispatcher.register(
                 literal("fusion").executes(context -> status(context.getSource()))
@@ -102,6 +171,12 @@ public final class InfiniteCraftMod implements ModInitializer {
                     return 1;
                 }))
                 .then(literal("collection").executes(context -> collection(context, 1))
+                        .then(literal("search").executes(context -> openSearch(context)))
+                        .then(literal("query").executes(context -> search(context, ""))
+                                .then(argument("query", StringArgumentType.greedyString()).executes(context ->
+                                        search(context, StringArgumentType.getString(context, "query")))))
+                        .then(literal("results").then(argument("page", IntegerArgumentType.integer(1)).executes(context ->
+                                searchResults(context, IntegerArgumentType.getInteger(context, "page")))))
                         .then(literal("back").then(argument("page", IntegerArgumentType.integer(1)).executes(context ->
                                 collection(context, IntegerArgumentType.getInteger(context, "page")))))
                         .then(literal("item").then(argument("item", IntegerArgumentType.integer(1))
@@ -177,10 +252,7 @@ public final class InfiniteCraftMod implements ModInitializer {
     private int collection(CommandContext<CommandSourceStack> context, int page, int itemId, int returnPage) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
         if (runtime == null) return status(context.getSource());
         var player = context.getSource().getPlayerOrException();
-        if (!soulboundBook() && !DiscoveryBook.isBook(player.containerMenu.getCarried())
-                && !java.util.stream.IntStream.concat(net.minecraft.world.entity.player.Inventory.EQUIPMENT_SLOT_MAPPING.keySet().intStream(),
-                        java.util.stream.IntStream.range(0, player.getInventory().getContainerSize()))
-                        .anyMatch(slot -> DiscoveryBook.isBook(player.getInventory().getItem(slot)))) {
+        if (!canOpenCollection(player)) {
             context.getSource().sendFailure(Component.literal("Craft a Discovery Book."));
             return 0;
         }
@@ -192,11 +264,51 @@ public final class InfiniteCraftMod implements ModInitializer {
         }
         player.openDialog(net.minecraft.core.Holder.direct(DiscoveryBook.createDialog(entries, page, personalBook(), itemId, returnPage)));
         // Send only to the reader so browsing never makes sounds for nearby players.
-        if (context.getNodes().stream().noneMatch(node -> node.getNode().getName().equals("back")))
-            player.connection.send(new net.minecraft.network.protocol.game.ClientboundSoundPacket(
+        if (context.getNodes().stream().noneMatch(node -> node.getNode().getName().equals("back"))) playBookClick(player);
+        return 1;
+    }
+
+    private boolean canOpenCollection(net.minecraft.server.level.ServerPlayer player) {
+        return soulboundBook() || DiscoveryBook.isBook(player.containerMenu.getCarried())
+                || java.util.stream.IntStream.concat(net.minecraft.world.entity.player.Inventory.EQUIPMENT_SLOT_MAPPING.keySet().intStream(),
+                        java.util.stream.IntStream.range(0, player.getInventory().getContainerSize()))
+                        .anyMatch(slot -> DiscoveryBook.isBook(player.getInventory().getItem(slot)));
+    }
+
+    private int openSearch(CommandContext<CommandSourceStack> context) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        var player = context.getSource().getPlayerOrException();
+        if (!canOpenCollection(player)) return 0;
+        player.openDialog(net.minecraft.core.Holder.direct(DiscoveryBook.createSearchDialog()));
+        return 1;
+    }
+
+    private int search(CommandContext<CommandSourceStack> context, String query) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        var player = context.getSource().getPlayerOrException();
+        if (!canOpenCollection(player)) return 0;
+        discoverySearches.put(player.getUUID(), query.strip());
+        return searchResults(context, 1, false);
+    }
+
+    private int searchResults(CommandContext<CommandSourceStack> context, int page) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        return searchResults(context, page, true);
+    }
+
+    private int searchResults(CommandContext<CommandSourceStack> context, int page, boolean playSound) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        if (runtime == null) return status(context.getSource());
+        var player = context.getSource().getPlayerOrException();
+        if (!canOpenCollection(player)) return 0;
+        String query = discoverySearches.getOrDefault(player.getUUID(), "");
+        var entries = DiscoveryBook.search(runtime.discoveries(player), query);
+        player.openDialog(net.minecraft.core.Holder.direct(DiscoveryBook.createDialog(entries, page,
+                personalBook(), 0, 1, "/fusion collection results ")));
+        if (playSound) playBookClick(player);
+        return 1;
+    }
+
+    private static void playBookClick(net.minecraft.server.level.ServerPlayer player) {
+        player.connection.send(new net.minecraft.network.protocol.game.ClientboundSoundPacket(
                 net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, net.minecraft.sounds.SoundSource.MASTER,
                 player.getX(), player.getEyeY(), player.getZ(), 0.3F, 1.0F, player.getRandom().nextLong()));
-        return 1;
     }
 
     private int status(CommandSourceStack source) {

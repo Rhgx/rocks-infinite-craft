@@ -36,6 +36,24 @@ import net.minecraft.world.level.entity.EntityTypeTest;
 public final class FusionRuntime implements AutoCloseable {
     private final MinecraftServer server;
     private ModConfig config;
+    private final FusionCrafter crafters;
+
+    ItemStack crafterPreview(net.minecraft.world.level.block.entity.CrafterBlockEntity block) { return crafters.preview(block); }
+    void crafterUser(net.minecraft.world.level.block.entity.CrafterBlockEntity block, ServerPlayer player) { crafters.user(block, player); }
+    void triggerCrafter(net.minecraft.world.level.block.entity.CrafterBlockEntity block) { crafters.trigger(block); }
+    ModConfig settings() { return config; }
+    boolean hasCapacity() { return pending + crafters.pending() < config.maxPending; }
+    String queueMessage(String key) {
+        var queue = engine.queuePosition(key);
+        return queue == null ? null : "Fusion queued" + ".".repeat(1 + (int) ((ticks / 10) % 3))
+                + " (" + queue.position() + "/" + queue.total() + ")";
+    }
+    void unloadCrafter(net.minecraft.world.level.block.entity.CrafterBlockEntity block) { crafters.unload(block); }
+    void touchCrafter(net.minecraft.world.level.block.entity.CrafterBlockEntity block) { crafters.touch(block); }
+    void releaseRecipe(String key) {
+        if (!crafters.uses(key) && combining.values().stream().noneMatch(job -> job.recipeKey().equals(key)))
+            engine.cancelRecipe(key);
+    }
     private RecipeEngine engine;
     private final RecipeStore store;
     private final DiscoveryCollection discoveries;
@@ -77,6 +95,7 @@ public final class FusionRuntime implements AutoCloseable {
     public FusionRuntime(MinecraftServer server, ModConfig config) throws IOException {
         this.server = server;
         this.config = config;
+        crafters = new FusionCrafter(this, server);
         dataDirectory = server.getWorldPath(LevelResource.ROOT).resolve("infinitecraft");
         fusionEnabled = FusionWorldState.load(dataDirectory.resolve("fusion-enabled.json"));
         store = new RecipeStore(dataDirectory.resolve("recipes.json"));
@@ -97,7 +116,7 @@ public final class FusionRuntime implements AutoCloseable {
                 if (!settings.generationEnabled) throw new IllegalStateException("Recipe generation is disabled");
                 return provider.generateCandidates(request);
             }
-        }, settings.maxPending, settings.generationAttempts);
+        }, settings.maxPending, settings.generationAttempts, settings.generationThreads);
     }
 
     /** Preserve one synchronized store and export worker across settings changes. */
@@ -126,6 +145,7 @@ public final class FusionRuntime implements AutoCloseable {
 
     private void cancelExchanges() {
         epoch++;
+        crafters.cancelAll();
         engine.cancelPendingGeneration();
         reserved.clear();
         combining.clear();
@@ -159,7 +179,7 @@ public final class FusionRuntime implements AutoCloseable {
 
     public String status() {
         return "Infinite Craft: " + catalog.size() + " catalog entries, " + allowed.size()
-                + " eligible items, " + overrides.size() + " explicit recipes, " + pending
+                + " eligible items, " + overrides.size() + " explicit recipes, " + (pending + crafters.pending())
                 + " pending exchanges. Provider: " + config.provider.provider() + ". Fusion is " + (enabled() ? "on." : "off.");
     }
 
@@ -210,24 +230,30 @@ public final class FusionRuntime implements AutoCloseable {
     public boolean soulboundBook() { return config.soulboundBook; }
     public boolean personalBook() { return config.personalBook; }
 
-    private boolean isSpecial(ItemStack stack) {
+    boolean isSpecial(ItemStack stack) {
         return ItemDataFusion.specialIngredient(stack, config.specialRarity, config.specialEnchantments,
                 config.specialPotions, config.specialCustomData);
     }
 
-    private void recordDiscovery(ItemStack first, ItemStack second, ItemStack output, ServerPlayer player) {
+    void recordDiscovery(ItemStack first, ItemStack second, ItemStack output, ServerPlayer player) {
         try {
             int revision = discoveries.revision();
             boolean firstDiscovery = discoveries.record(first, second, output, player.getName().getString(), player.getUUID());
             if (revision == discoveries.revision()) return;
             int discoveryCount = firstDiscovery ? discoveries.outputCount() : 0;
-            if (firstDiscovery && config.milestoneMessages && isMilestone(discoveryCount)) {
-                var milestone = Component.literal(discoveryCount + " discoveries!")
-                        .withStyle(net.minecraft.ChatFormatting.GOLD, net.minecraft.ChatFormatting.BOLD);
-                for (var viewer : server.getPlayerList().getPlayers()) viewer.sendSystemMessage(milestone);
+            int milestoneTier = milestoneTier(discoveryCount);
+            if (firstDiscovery && config.milestoneMessages && milestoneTier >= 0) {
+                int experience = milestoneExperience(milestoneTier);
+                player.giveExperiencePoints(experience);
+                var milestone = milestoneMessage(discoveryCount, milestoneTier, player.getName().getString());
+                for (var viewer : server.getPlayerList().getPlayers()) viewer.sendSystemMessage(viewer == player
+                        ? milestone.copy().append(Component.literal("  +" + experience + " XP")
+                                .withStyle(net.minecraft.ChatFormatting.GRAY))
+                        : milestone);
             }
             discoveries.saveAsync(exportWorker,
                     error -> InfiniteCraftMod.LOGGER.error("Could not save discovery collection", error));
+            if (firstDiscovery && isSpecial(output)) SpecialItemsTab.sendAll(server, discoveries.entries());
             if (firstDiscovery && (isSpecial(output) ? config.specialDiscoveryMessage : config.firstDiscoveryMessage)) {
                 var message = discoveryMessage(output, player.getName().getString(), isSpecial(output));
                 for (var viewer : server.getPlayerList().getPlayers()) viewer.sendSystemMessage(message);
@@ -249,10 +275,34 @@ public final class FusionRuntime implements AutoCloseable {
     }
 
     static boolean isMilestone(int count) {
+        return milestoneTier(count) >= 0;
+    }
+
+    static int milestoneTier(int count) {
+        int tier = 0;
         for (long scale = 10; scale <= count; scale *= 10) {
-            if (count == scale || count == scale * 5 / 2 || count == scale * 5) return true;
+            if (count == scale) return tier;
+            if (count == scale * 5 / 2) return tier + 1;
+            if (count == scale * 5) return tier + 2;
+            tier += 3;
         }
-        return false;
+        return -1;
+    }
+
+    static int milestoneExperience(int tier) {
+        return Math.min(50 + Math.max(0, tier) * 50, 500);
+    }
+
+    static Component milestoneMessage(int count, int tier, String discoverer) {
+        var numberColor = tier >= 6 ? net.minecraft.ChatFormatting.LIGHT_PURPLE
+                : tier >= 4 ? net.minecraft.ChatFormatting.GOLD
+                : tier >= 2 ? net.minecraft.ChatFormatting.AQUA : net.minecraft.ChatFormatting.GREEN;
+        var textColor = tier >= 6 ? net.minecraft.ChatFormatting.GOLD
+                : tier >= 4 ? net.minecraft.ChatFormatting.YELLOW : net.minecraft.ChatFormatting.GRAY;
+        boolean bold = tier >= 6;
+        return Component.literal(discoverer + " reached ").withStyle(style -> style.withColor(textColor).withBold(bold))
+                .append(Component.literal(Integer.toString(count)).withStyle(style -> style.withColor(numberColor).withBold(true)))
+                .append(Component.literal(" discoveries!").withStyle(style -> style.withColor(textColor).withBold(bold)));
     }
 
     public int shareRecipe(ServerPlayer player, int id) {
@@ -291,8 +341,10 @@ public final class FusionRuntime implements AutoCloseable {
     }
 
     public void tick() {
+        crafters.tick();
         if (!enabled()) return;
         ticks++;
+        cancelAbandonedExchanges();
         if (config.combiningParticles && ticks % 2 == 0) showCombiningParticles();
         if (config.queueFeedback && ticks % 10 == 0) {
             var notified = new HashSet<UUID>();
@@ -315,14 +367,14 @@ public final class FusionRuntime implements AutoCloseable {
             return entry.getValue().isEmpty();
         });
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            if (!enabled() || pending >= config.maxPending) continue;
+            if (!enabled() || !config.groundFusion || !hasCapacity()) continue;
             ServerLevel world = player.level();
             List<ItemEntity> nearby = new ArrayList<>();
             world.getEntities(EntityTypeTest.forClass(ItemEntity.class), player.getBoundingBox().inflate(8),
                     item -> eligible(item, player), nearby, config.maxNearbyItems + 1);
             // Skip overloaded areas rather than doing an unbounded pairwise scan.
             if (nearby.size() > config.maxNearbyItems) continue;
-            for (int first = 0; first < nearby.size() && pending < config.maxPending; first++) {
+            for (int first = 0; first < nearby.size() && hasCapacity(); first++) {
                 ItemEntity a = nearby.get(first);
                 if (!eligible(a, player)) continue;
                 for (int second = first + 1; second < nearby.size(); second++) {
@@ -337,6 +389,29 @@ public final class FusionRuntime implements AutoCloseable {
         }
     }
 
+    private void cancelAbandonedExchanges() {
+        var abandoned = combining.entrySet().stream().filter(entry -> !stillPresent(entry.getValue()))
+                .map(Map.Entry::getKey).toList();
+        for (long token : abandoned) {
+            CombiningVisual visual = combining.remove(token);
+            if (visual == null) continue;
+            pending--;
+            reserved.remove(visual.first(), token);
+            reserved.remove(visual.second(), token);
+            releaseRecipe(visual.recipeKey());
+        }
+    }
+
+    private boolean stillPresent(CombiningVisual visual) {
+        ServerPlayer player = server.getPlayerList().getPlayer(visual.player());
+        var first = visual.world().getEntity(visual.first());
+        var second = visual.world().getEntity(visual.second());
+        return config.groundFusion && player != null && player.level() == visual.world()
+                && first instanceof ItemEntity a && second instanceof ItemEntity b
+                && !a.isRemoved() && !b.isRemoved() && a.getOwner() == player && b.getOwner() == player
+                && a.distanceToSqr(b) <= 0.64 && a.distanceToSqr(player) <= 100;
+    }
+
     private boolean eligible(ItemEntity entity, ServerPlayer player) {
         ItemStack stack = entity.getItem();
         return !entity.isRemoved() && entity.getOwner() == player && !stack.isEmpty() && !DiscoveryBook.isBook(stack) && FusionDrops.intentional(entity)
@@ -345,92 +420,27 @@ public final class FusionRuntime implements AutoCloseable {
 
     private void request(ServerLevel world, ServerPlayer player, ItemEntity a, ItemEntity b) {
         if (a == b) return;
-        ItemStack first = a.getItem().copy();
-        ItemStack second = b.getItem().copy();
-        // Only crafted lineage markers count here, not ingredients that merely trigger special generation.
-        if (!config.combineSpecialItems && FusionCount.get(first) >= 0 && FusionCount.get(second) >= 0) {
-            deny(world, player, a, b, "Combining special items is disabled.");
-            return;
-        }
-        if (FusionCount.exhausted(first) || FusionCount.exhausted(second)) {
-            deny(world, player, a, b, "Combination limit reached (5/5).");
-            return;
-        }
-        if (ItemTraits.inherited(first, second).size() > config.maxTraits) {
-            deny(world, player, a, b, "Trait limit reached.");
-            return;
-        }
-        String firstId = BuiltInRegistries.ITEM.getKey(first.getItem()).toString();
-        String secondId = BuiltInRegistries.ITEM.getKey(second.getItem()).toString();
-        if ((!config.allowItemData && (!first.getComponentsPatch().isEmpty() || !second.getComponentsPatch().isEmpty()))
-                || !ItemDataFusion.supported(first) || !ItemDataFusion.supported(second)
-                || !allowed.contains(firstId) || !allowed.contains(secondId)) {
-            deny(world, player, a, b, "Unsupported ingredients.");
-            return;
-        }
-        boolean hasData = !first.getComponentsPatch().isEmpty() || !second.getComponentsPatch().isEmpty();
-        RecipeResult known;
-        try { known = engine.knownRecipe(firstId, secondId, overrides).orElse(null); }
-        catch (IllegalStateException error) {
-            deny(world, player, a, b, "Recipe update pending.");
-            return;
-        }
-        var effects = PotionFusion.describe(first, second);
-        boolean ingredientTriggered = config.generatedTraits && config.specialIngredientTriggers
-                && (isSpecial(first) || isSpecial(second));
-        boolean generateVariant = hasData && !overrides.containsKey(dev.rocks.infinitecraft.core.PairKey.of(firstId, secondId));
-        String failureKey;
-        try { failureKey = hasData ? componentFailureKey(first, second) : ""; }
-        catch (RuntimeException error) { deny(world, player, a, b, "Unsupported item data."); return; }
-        var saved = generateVariant ? engine.knownVariant(failureKey).orElse(null) : known;
-        boolean needsGeneration = saved == null;
-        Set<String> compatibleIds = hasData ? compatibleOutputs(first, second, saved) : allowed;
-        ItemStack dataFirst = first, dataSecond = second;
-        int dataPriority = 0;
-        if (compatibleIds.isEmpty()) {
-            var ops = server.registryAccess().createSerializationContext(com.mojang.serialization.JsonOps.INSTANCE);
-            boolean firstWins = ComponentPairKey.firstWins(
-                    ItemStack.CODEC.encodeStart(ops, first.copyWithCount(1)).getOrThrow(),
-                    ItemStack.CODEC.encodeStart(ops, second.copyWithCount(1)).getOrThrow(), server.overworld().getSeed());
-            dataPriority = firstWins ? 1 : 2;
-            dataFirst = firstWins ? first : ItemStack.EMPTY;
-            dataSecond = firstWins ? ItemStack.EMPTY : second;
-            compatibleIds = compatibleOutputs(dataFirst, dataSecond, saved);
-        }
-        final ItemStack preservedFirst = dataFirst, preservedSecond = dataSecond;
-        if (compatibleIds.isEmpty()) {
-            deny(world, player, a, b, "Item data is incompatible.");
-            return;
-        }
+        ItemStack liveFirst = a.getItem().copy();
+        ItemStack liveSecond = b.getItem().copy();
+        PreparedFusion prepared;
+        try { prepared = prepareFusion(liveFirst, liveSecond); }
+        catch (IllegalArgumentException error) { deny(world, player, a, b, error.getMessage()); return; }
         long requestEpoch = epoch;
         long token = ++requestId;
         reserved.put(a.getUUID(), token);
         reserved.put(b.getUUID(), token);
-        combining.put(token, new CombiningVisual(world, player.getUUID(), a.getUUID(), b.getUUID(),
-                generateVariant ? failureKey : dev.rocks.infinitecraft.core.PairKey.of(firstId, secondId)));
+        combining.put(token, new CombiningVisual(world, player.getUUID(), a.getUUID(), b.getUUID(), prepared.key()));
         pending++;
-        GenerationRequest request = new GenerationRequest(firstId, secondId,
-                needsGeneration ? candidateIndex.candidates(firstId, secondId, config.candidateLimit, compatibleIds) : List.of(),
-                config.generatedTraits && (ingredientTriggered || world.getRandom().nextInt(100) < config.specialResultChance)
-                        ? VanillaTraits.ids() : List.of(), effects, config.maxOutputCount, config.power, config.silliness,
-                config.generatedTraits && !PotionFusion.describe(preservedFirst, preservedSecond).isEmpty() ? potionOptions : Map.of(),
-                config.maxTraits, ItemTraits.inherited(preservedFirst, preservedSecond),
-                !config.specialRarity ? 0 : dev.rocks.infinitecraft.core.RecipeQuality.fromRarities(
-                        first.getOrDefault(net.minecraft.core.component.DataComponents.RARITY, net.minecraft.world.item.Rarity.COMMON).ordinal(),
-                        second.getOrDefault(net.minecraft.core.component.DataComponents.RARITY, net.minecraft.world.item.Rarity.COMMON).ordinal()), dataPriority);
-        java.util.function.Predicate<RecipeResult> validator = result -> validateOnServer(result, first, second, preservedFirst, preservedSecond, requestEpoch);
-        // Effect-bearing variants go through generation, not a local brewing shortcut or ID-only discovery.
-        var resolution = generateVariant
-                ? engine.resolveVariant(request, allowed, validator, failureKey)
-                : engine.resolve(request, overrides, allowed, validator);
+        ItemStack preservedFirst = prepared.dataFirst(), preservedSecond = prepared.dataSecond();
+        var resolution = prepared.resolution();
         resolution.whenComplete((result, error) -> {
             if (closed) return;
             server.execute(() -> {
                 try {
                     if (closed) return;
                     if (requestEpoch != epoch) return;
+                    if (combining.remove(token) == null) return;
                     pending--;
-                    combining.remove(token);
                     boolean owns = Objects.equals(reserved.get(a.getUUID()), token)
                             && Objects.equals(reserved.get(b.getUUID()), token);
                     reserved.remove(a.getUUID(), token);
@@ -452,8 +462,8 @@ public final class FusionRuntime implements AutoCloseable {
                             || a.getOwner() != player || b.getOwner() != player
                             || world.getEntity(a.getUUID()) != a || world.getEntity(b.getUUID()) != b
                             || a.isRemoved() || b.isRemoved() || a.distanceToSqr(b) > 0.64
-                            || a.distanceToSqr(player) > 100 || !ItemStack.matches(first, a.getItem())
-                            || !ItemStack.matches(second, b.getItem()) || !allowed.contains(result.itemId())) return;
+                            || a.distanceToSqr(player) > 100 || !ItemStack.matches(liveFirst, a.getItem())
+                            || !ItemStack.matches(liveSecond, b.getItem()) || !allowed.contains(result.itemId())) return;
                     try {
                         if (!exchange(world, a, b, result, player, preservedFirst, preservedSecond)) {
                             deny(world, player, a, b, "Fusion result unavailable.");
@@ -469,6 +479,84 @@ public final class FusionRuntime implements AutoCloseable {
                 }
             });
         });
+    }
+
+    record PreparedFusion(CompletableFuture<RecipeResult> resolution, String key,
+            ItemStack dataFirst, ItemStack dataSecond) {}
+
+    PreparedFusion prepareFusion(ItemStack liveFirst, ItemStack liveSecond) {
+        ItemStack first = FusionOrigin.strip(liveFirst);
+        ItemStack second = FusionOrigin.strip(liveSecond);
+        // Only crafted lineage markers count here, not ingredients that merely trigger special generation.
+        if (!config.combineSpecialItems && FusionCount.get(first) >= 0 && FusionCount.get(second) >= 0) {
+            throw new IllegalArgumentException("Combining special items is disabled.");
+        }
+        if (FusionCount.exhausted(first) || FusionCount.exhausted(second)) {
+            throw new IllegalArgumentException("Combination limit reached (5/5).");
+        }
+        if (ItemTraits.inherited(first, second).size() > config.maxTraits) {
+            throw new IllegalArgumentException("Trait limit reached.");
+        }
+        String firstId = BuiltInRegistries.ITEM.getKey(first.getItem()).toString();
+        String secondId = BuiltInRegistries.ITEM.getKey(second.getItem()).toString();
+        if ((!config.allowItemData && (!first.getComponentsPatch().isEmpty() || !second.getComponentsPatch().isEmpty()))
+                || !ItemDataFusion.supported(first) || !ItemDataFusion.supported(second)
+                || !allowed.contains(firstId) || !allowed.contains(secondId)) {
+            throw new IllegalArgumentException("Unsupported ingredients.");
+        }
+        boolean hasData = !first.getComponentsPatch().isEmpty() || !second.getComponentsPatch().isEmpty();
+        RecipeResult known;
+        try { known = engine.knownRecipe(firstId, secondId, overrides).orElse(null); }
+        catch (IllegalStateException error) {
+            throw new IllegalArgumentException("Recipe update pending.");
+        }
+        var effects = PotionFusion.describe(first, second);
+        boolean ingredientTriggered = config.generatedTraits && config.specialIngredientTriggers
+                && (isSpecial(first) || isSpecial(second));
+        boolean generateVariant = hasData && !overrides.containsKey(dev.rocks.infinitecraft.core.PairKey.of(firstId, secondId));
+        String failureKey;
+        try { failureKey = hasData ? componentFailureKey(first, second) : ""; }
+        catch (RuntimeException error) { throw new IllegalArgumentException("Unsupported item data."); }
+        var variant = generateVariant ? engine.knownVariant(failureKey).orElse(null) : null;
+        var saved = generateVariant ? cachedVariantOrBase(variant, known,
+                recipe -> compatibleOutput(recipe.itemId(), first, second)) : known;
+        if (generateVariant && saved == known && known != null) generateVariant = false;
+        boolean needsGeneration = saved == null;
+        Set<String> compatibleIds = hasData ? compatibleOutputs(first, second, saved) : allowed;
+        ItemStack dataFirst = first, dataSecond = second;
+        int dataPriority = 0;
+        if (compatibleIds.isEmpty()) {
+            var ops = server.registryAccess().createSerializationContext(com.mojang.serialization.JsonOps.INSTANCE);
+            boolean firstWins = ComponentPairKey.firstWins(
+                    ItemStack.CODEC.encodeStart(ops, first.copyWithCount(1)).getOrThrow(),
+                    ItemStack.CODEC.encodeStart(ops, second.copyWithCount(1)).getOrThrow(), server.overworld().getSeed());
+            dataPriority = firstWins ? 1 : 2;
+            dataFirst = firstWins ? first : ItemStack.EMPTY;
+            dataSecond = firstWins ? ItemStack.EMPTY : second;
+            compatibleIds = compatibleOutputs(dataFirst, dataSecond, saved);
+        }
+        final ItemStack preservedFirst = dataFirst, preservedSecond = dataSecond;
+        if (compatibleIds.isEmpty()) {
+            throw new IllegalArgumentException("Item data is incompatible.");
+        }
+        long requestEpoch = epoch;
+        GenerationRequest request = new GenerationRequest(firstId, secondId,
+                needsGeneration ? candidateIndex.candidates(firstId, secondId, config.candidateLimit, compatibleIds) : List.of(),
+                config.generatedTraits && (ingredientTriggered || server.overworld().getRandom().nextInt(100) < config.specialResultChance)
+                        ? VanillaTraits.ids() : List.of(), effects, config.maxOutputCount, config.power, config.silliness,
+                config.generatedTraits && !PotionFusion.describe(preservedFirst, preservedSecond).isEmpty() ? potionOptions : Map.of(),
+                config.maxTraits, ItemTraits.inherited(preservedFirst, preservedSecond),
+                !config.specialRarity ? 0 : dev.rocks.infinitecraft.core.RecipeQuality.fromRarities(
+                        first.getOrDefault(net.minecraft.core.component.DataComponents.RARITY, net.minecraft.world.item.Rarity.COMMON).ordinal(),
+                        second.getOrDefault(net.minecraft.core.component.DataComponents.RARITY, net.minecraft.world.item.Rarity.COMMON).ordinal()), dataPriority);
+        java.util.function.Predicate<RecipeResult> validator = result -> validateOnServer(result, first, second, preservedFirst, preservedSecond, requestEpoch);
+        // Effect-bearing variants go through generation, not a local brewing shortcut or ID-only discovery.
+        var resolution = generateVariant
+                ? engine.resolveVariant(request, allowed, validator, failureKey)
+                : engine.resolve(request, overrides, allowed, validator);
+        return new PreparedFusion(resolution,
+                generateVariant ? failureKey : dev.rocks.infinitecraft.core.PairKey.of(firstId, secondId),
+                preservedFirst, preservedSecond);
     }
 
     private Set<String> compatibleOutputs(ItemStack first, ItemStack second, RecipeResult saved) {
@@ -489,7 +577,12 @@ public final class FusionRuntime implements AutoCloseable {
                 .getDefaultInstance(), first, second, false).isEmpty();
     }
 
-    private ItemStack outputFor(RecipeResult result, ItemStack first, ItemStack second, ItemStack dataFirst, ItemStack dataSecond) {
+    static RecipeResult cachedVariantOrBase(RecipeResult variant, RecipeResult base,
+            java.util.function.Predicate<RecipeResult> compatible) {
+        return variant != null ? variant : base != null && compatible.test(base) ? base : null;
+    }
+
+    ItemStack outputFor(RecipeResult result, ItemStack first, ItemStack second, ItemStack dataFirst, ItemStack dataSecond) {
         if (result.traits().size() > config.maxTraits) return ItemStack.EMPTY;
         Identifier id = Identifier.tryParse(result.itemId());
         if (id == null || !allowed.contains(result.itemId()) || !BuiltInRegistries.ITEM.containsKey(id)) return ItemStack.EMPTY;
@@ -516,6 +609,7 @@ public final class FusionRuntime implements AutoCloseable {
         }
         if (!output.isEmpty() && !FusionCount.apply(output, first, second, this::isSpecial)) return ItemStack.EMPTY;
         if (!output.isEmpty() && !ItemTraits.apply(output, dataFirst, dataSecond, result.traits(), config.maxTraits)) return ItemStack.EMPTY;
+        if (!output.isEmpty() && !FusionOrigin.apply(output, first, second)) return ItemStack.EMPTY;
         if (output.isEmpty() || output.getCount() > output.getMaxStackSize()) return ItemStack.EMPTY;
         return ItemStack.validateStrict(output).result().orElse(ItemStack.EMPTY);
     }
@@ -647,7 +741,7 @@ public final class FusionRuntime implements AutoCloseable {
         }
     }
 
-    private static void showSpecialParticles(ServerLevel world, net.minecraft.world.phys.Vec3 center) {
+    static void showSpecialParticles(ServerLevel world, net.minecraft.world.phys.Vec3 center) {
         for (int i = 0; i < 8; i++) {
             double angle = i * Math.PI / 2;
             sendParticleOutsideBlocks(world, i % 2 == 0 ? ParticleTypes.WITCH : ParticleTypes.END_ROD,
@@ -656,7 +750,7 @@ public final class FusionRuntime implements AutoCloseable {
         }
     }
 
-    private static void showResultParticles(ServerLevel world, net.minecraft.world.phys.Vec3 center,
+    static void showResultParticles(ServerLevel world, net.minecraft.world.phys.Vec3 center,
             boolean success) {
         // Different native textures and motion distinguish outcomes without colored dust.
         var particle = success ? ParticleTypes.HAPPY_VILLAGER : ParticleTypes.SMOKE;
@@ -668,7 +762,7 @@ public final class FusionRuntime implements AutoCloseable {
         }
     }
 
-    private static void sendParticleOutsideBlocks(ServerLevel world, ParticleOptions particle,
+    static void sendParticleOutsideBlocks(ServerLevel world, ParticleOptions particle,
             double x, double y, double z) {
         // Keep spawn positions outside blocks, with room for the visible particle. No downward launch velocity.
         if (world.noBlockCollision(null, new net.minecraft.world.phys.AABB(x - .15, y - .15, z - .15,
@@ -678,6 +772,7 @@ public final class FusionRuntime implements AutoCloseable {
 
     @Override public void close() {
         closed = true;
+        crafters.close();
         engine.close();
         exportWorker.shutdown();
         try {

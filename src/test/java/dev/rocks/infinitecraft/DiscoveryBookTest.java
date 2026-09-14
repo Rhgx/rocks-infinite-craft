@@ -150,7 +150,9 @@ class DiscoveryBookTest {
             var bottom = ((net.minecraft.server.dialog.body.PlainMessage) state.common().body().getLast()).contents();
             assertEquals(top, bottom);
             assertEquals(state == dialog, top.getSiblings().get(0).getStyle().getClickEvent() != null);
-            assertEquals(state == firstPage, top.getSiblings().get(2).getStyle().getClickEvent() != null);
+            assertEquals(new net.minecraft.network.chat.ClickEvent.RunCommand("/fusion collection search"),
+                    top.getSiblings().get(2).getStyle().getClickEvent());
+            assertEquals(state == firstPage, top.getSiblings().get(4).getStyle().getClickEvent() != null);
         }
         assertTrue(((net.minecraft.server.dialog.body.PlainMessage) dialog.common().body().getFirst()).contents().getString().endsWith("Page 2 of 2"));
         assertEquals(2, dialog.common().body().stream().filter(ItemBody.class::isInstance).count());
@@ -177,6 +179,18 @@ class DiscoveryBookTest {
                 decodedNav.getSiblings().getFirst().getStyle().getClickEvent());
 
         assertTrue(encoded.result().orElseThrow().toString().contains("/fusion collection 1"));
+        var search = DiscoveryBook.createSearchDialog();
+        assertEquals("Search discoveries", search.common().title().getString());
+        assertEquals("query", search.common().inputs().getFirst().key());
+        assertEquals("Search", search.yesButton().button().label().getString());
+        assertEquals("Back", search.noButton().button().label().getString());
+        assertEquals(new net.minecraft.network.chat.ClickEvent.RunCommand("/fusion collection back 1"),
+                ((net.minecraft.server.dialog.action.StaticAction) search.noButton().action().orElseThrow()).value());
+        assertTrue(Dialog.DIRECT_CODEC.encodeStart(lookup.createSerializationContext(JsonOps.INSTANCE), search).isSuccess());
+        assertEquals(entries, DiscoveryBook.search(entries, ""));
+        assertEquals(List.of(entries.get(26)), DiscoveryBook.search(entries, "dscvry 26"));
+        assertTrue(DiscoveryBook.search(entries, "missing").isEmpty());
+        assertTrue(DiscoveryBook.search(entries, "dirt cake").isEmpty());
         assertEquals("Discovery Book", DiscoveryBook.createDialog(List.of(), -1).common().title().getString());
         var personalEntry = new DiscoveryCollection.Entry(new ItemStack(Items.STICK), new ItemStack(Items.COAL),
                 new ItemStack(Items.TORCH), "OtherName", 42);
@@ -192,7 +206,10 @@ class DiscoveryBookTest {
                 new ItemStack(Items.TORCH), "Friend", 43);
         var recipes = List.of(personalEntry, alternative);
         var multiple = ((ItemBody) DiscoveryBook.createDialog(recipes, 1).common().body().get(2)).description().orElseThrow().contents();
-        assertTrue(multiple.getString().endsWith("By OtherName · [+1]"));
+        assertTrue(multiple.getString().contains("By "));
+        assertTrue(multiple.getString().contains("OtherName"));
+        assertTrue(multiple.getString().contains("Friend"));
+        assertTrue(multiple.getString().endsWith(" · [+1]"));
         assertEquals("Torch", multiple.getSiblings().getFirst().getString());
         assertEquals(0x55FFFF, multiple.getSiblings().getLast().getStyle().getColor().getValue());
         assertNull(multiple.getSiblings().getFirst().getStyle().getClickEvent());
@@ -207,5 +224,21 @@ class DiscoveryBookTest {
         var detailJson = Dialog.DIRECT_CODEC.encodeStart(lookup.createSerializationContext(JsonOps.INSTANCE), details).getOrThrow();
         assertTrue(detailJson.toString().contains("/fusion collection back 2"));
         assertNotNull(Dialog.DIRECT_CODEC.parse(lookup.createSerializationContext(JsonOps.INSTANCE), detailJson).getOrThrow());
+        var originated = new ItemStack(Items.TORCH);
+        assertTrue(FusionOrigin.apply(originated, new ItemStack(Items.STICK), new ItemStack(Items.COAL)));
+        assertFalse(DiscoveryBook.displayStack(originated).getOrDefault(DataComponents.LORE,
+                net.minecraft.world.item.component.ItemLore.EMPTY).lines().stream()
+                .anyMatch(line -> line.getString().startsWith("Made from ")));
+        var byline = DiscoveryBook.discovererLine(List.of("Rocks", "Friend", "Third"));
+        assertTrue(byline.getString().contains("Rocks"));
+        assertTrue(byline.getString().contains("Friend"));
+        assertTrue(byline.getString().endsWith("and 1 more"));
+        var moreNames = assertInstanceOf(net.minecraft.network.chat.HoverEvent.ShowText.class,
+                byline.getSiblings().getLast().getStyle().getHoverEvent());
+        assertTrue(moreNames.value().getString().contains("Third"));
+        var compactByline = DiscoveryBook.discovererLine(
+                List.of("Only16Characters", "Only16Characters", "Third"), 1);
+        assertTrue(compactByline.getString().contains("Only16Characters and 2 more"));
+        assertFalse(compactByline.getString().contains(","));
     }
 }

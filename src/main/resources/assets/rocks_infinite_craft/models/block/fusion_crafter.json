@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "north": "rocks_infinite_craft:block/fusion_crafter_front",
+    "south": "rocks_infinite_craft:block/fusion_crafter_back",
+    "west": "rocks_infinite_craft:block/fusion_crafter_left",
+    "east": "rocks_infinite_craft:block/fusion_crafter_right",
+    "up": "rocks_infinite_craft:block/fusion_crafter_top",
+    "down": "rocks_infinite_craft:block/fusion_crafter_bottom",
+    "particle": "rocks_infinite_craft:block/fusion_crafter_right"
+  }
+}

@@ -13,10 +13,14 @@ import net.minecraft.server.dialog.ActionButton;
 import net.minecraft.server.dialog.CommonButtonData;
 import net.minecraft.server.dialog.CommonDialogData;
 import net.minecraft.server.dialog.DialogAction;
+import net.minecraft.server.dialog.Input;
+import net.minecraft.server.dialog.action.CommandTemplate;
+import net.minecraft.server.dialog.action.ParsedTemplate;
 import net.minecraft.server.dialog.action.StaticAction;
 import net.minecraft.server.dialog.body.DialogBody;
 import net.minecraft.server.dialog.body.ItemBody;
 import net.minecraft.server.dialog.body.PlainMessage;
+import net.minecraft.server.dialog.input.TextInput;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -36,6 +40,8 @@ import java.util.function.Function;
 
 /** Vanilla knowledge book and dialogs; no custom item, screen, or packet registration. */
 public final class DiscoveryBook {
+    private static final java.util.regex.Pattern SEARCH_WORD_SEPARATOR =
+            java.util.regex.Pattern.compile("[^a-z0-9]+");
     private static final String MARKER = "infinitecraft_discovery_book";
     private static final int PAGE_SIZE = 25;
     private static final int ROW_HEIGHT = 5 * 9 + 8; // Five font lines plus vanilla text-widget padding.
@@ -67,7 +73,12 @@ public final class DiscoveryBook {
         if (!isBook(player.getItemInHand(hand))) return InteractionResult.PASS;
         if (player instanceof ServerPlayer serverPlayer) {
             try {
-                show(serverPlayer, entries.apply(serverPlayer), 1);
+                var discoveries = entries.apply(serverPlayer);
+                if (net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.canSend(
+                        serverPlayer, DiscoveryScreenPayload.TYPE))
+                    net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(serverPlayer,
+                            new DiscoveryScreenPayload(discoveries, InfiniteCraftMod.personalBook()));
+                else show(serverPlayer, discoveries, 1);
             } catch (RuntimeException error) {
                 InfiniteCraftMod.LOGGER.warn("Could not open discovery collection", error);
                 serverPlayer.sendSystemMessage(Component.literal("Could not open collection."));
@@ -266,6 +277,11 @@ public final class DiscoveryBook {
 
     static net.minecraft.server.dialog.NoticeDialog createDialog(List<DiscoveryCollection.Entry> entries, int requestedPage,
             boolean personal, int itemId, int returnPage) {
+        return createDialog(entries, requestedPage, personal, itemId, returnPage, null);
+    }
+
+    static net.minecraft.server.dialog.NoticeDialog createDialog(List<DiscoveryCollection.Entry> entries, int requestedPage,
+            boolean personal, int itemId, int returnPage, String pageCommandOverride) {
         var groups = DiscoveryCollection.groupResults(entries);
         var selected = itemId > 0 ? entries.stream().filter(entry -> entry.id() == itemId).findFirst()
                 : Optional.<DiscoveryCollection.Entry>empty();
@@ -277,27 +293,32 @@ public final class DiscoveryBook {
         int page = Math.max(1, Math.min(requestedPage, pages));
         int start = (page - 1) * PAGE_SIZE;
         List<DialogBody> body = new ArrayList<>();
-        String pageCommand = detail ? "/fusion collection item " + itemId + " " + returnPage + " " : "/fusion collection ";
+        String pageCommand = detail ? "/fusion collection item " + itemId + " " + returnPage + " "
+                : pageCommandOverride == null ? "/fusion collection " : pageCommandOverride;
         body.add(new PlainMessage(Component.literal(entries.size() + (detail ? (entries.size() == 1 ? " recipe" : " recipes") : (entries.size() == 1 ? " discovery" : " discoveries"))
                 + "  ·  Page " + page + " of " + pages).withStyle(ChatFormatting.GRAY), 320));
         var navigation = new PlainMessage(Component.empty()
                 .append(pageArrow("<", "Previous page", pageCommand + (page - 1), page > 1))
-                .append(Component.literal("       "))
+                .append(Component.literal("   "))
+                .append(searchButton())
+                .append(Component.literal("   "))
                 .append(pageArrow(">", "Next page", pageCommand + (page + 1), page < pages)), 320);
         body.add(navigation);
         for (int index = start; index < Math.min(entries.size(), start + PAGE_SIZE); index++) {
             var entry = entries.get(index);
             int discoveryId = entry.id() > 0 ? entry.id() : entries.size() - index;
-            int recipeCount = groups.get(new DiscoveryCollection.ResultKey(entry.result())).size();
+            var resultRecipes = groups.get(new DiscoveryCollection.ResultKey(entry.result()));
+            int recipeCount = resultRecipes.size();
             var name = itemName(entry.result(), false).copy();
             var description = Component.empty()
                     .append(name)
                     .append(Component.literal("\n\n"))
                     .append(itemName(entry.first(), true))
                     .append(Component.literal(" + ").withStyle(ChatFormatting.GRAY))
-                    .append(itemName(entry.second(), true))
-                    .append(Component.literal(personal ? "\n\n" : "\n\nBy " + shortText(entry.discoverer(), 24))
-                            .withStyle(ChatFormatting.GRAY));
+                    .append(itemName(entry.second(), true));
+            if (!personal) description.append(Component.literal("\n\n"))
+                    .append(discovererLine(DiscoveryCollection.discoverers(detail ? List.of(entry) : resultRecipes)));
+            else description.append(Component.literal("\n\n"));
             if (!detail && recipeCount > 1) {
                 if (!personal) description.append(Component.literal(" · ").withStyle(ChatFormatting.GRAY));
                 description.append(Component.literal("[+" + (recipeCount - 1) + "]").withStyle(style -> style
@@ -309,7 +330,7 @@ public final class DiscoveryBook {
             if (personal) description.append(Component.literal("[Share]").withStyle(style -> style.withColor(ChatFormatting.GOLD)
                             .withClickEvent(new ClickEvent.RunCommand("/fusion share " + discoveryId))
                             .withHoverEvent(new HoverEvent.ShowText(Component.literal("Share recipe in chat")))));
-            body.add(new ItemBody(ItemStackTemplate.fromNonEmptyStack(entry.result()),
+            body.add(new ItemBody(ItemStackTemplate.fromNonEmptyStack(displayStack(entry.result())),
                     Optional.of(new PlainMessage(description, 280)), false, true, 32, ROW_HEIGHT));
         }
         // Reserve every row so short pages keep the same viewport and navigation positions.
@@ -324,6 +345,59 @@ public final class DiscoveryBook {
         var close = new ActionButton(new CommonButtonData(Component.literal(detail ? "Back" : "Close"), 150),
                 Optional.of(new StaticAction(new ClickEvent.RunCommand(detail ? "/fusion collection back " + returnPage : "/fusion collection close"))));
         return new net.minecraft.server.dialog.NoticeDialog(common, close);
+    }
+
+    static net.minecraft.server.dialog.ConfirmationDialog createSearchDialog() {
+        var common = new CommonDialogData(Component.literal("Search discoveries")
+                .withStyle(style -> style.withColor(0xFFAA00).withItalic(false)), Optional.empty(), true, false,
+                DialogAction.NONE, List.of(), List.of(new Input("query",
+                        new TextInput(280, Component.literal("Search"), false, "", 80, Optional.empty()))));
+        var template = ParsedTemplate.CODEC.parse(com.mojang.serialization.JsonOps.INSTANCE,
+                new com.google.gson.JsonPrimitive("/fusion collection query $(query)")).getOrThrow();
+        var search = new ActionButton(new CommonButtonData(Component.literal("Search"), 150),
+                Optional.of(new CommandTemplate(template)));
+        var back = new ActionButton(new CommonButtonData(Component.literal("Back"), 150),
+                Optional.of(new StaticAction(new ClickEvent.RunCommand("/fusion collection back 1"))));
+        return new net.minecraft.server.dialog.ConfirmationDialog(common, search, back);
+    }
+
+    public static List<DiscoveryCollection.Entry> search(List<DiscoveryCollection.Entry> entries, String query) {
+        var terms = java.util.Arrays.stream(query.toLowerCase(java.util.Locale.ROOT).trim().split("\\s+"))
+                .filter(term -> !term.isEmpty()).toList();
+        if (terms.isEmpty()) return entries;
+        return entries.stream().filter(entry -> {
+            var fields = List.of(entry.result().getHoverName().getString(), entry.first().getHoverName().getString(),
+                    entry.second().getHoverName().getString(), entry.discoverer(), entry.result().getItem().toString(),
+                    entry.first().getItem().toString(), entry.second().getItem().toString()).stream()
+                    .map(text -> text.toLowerCase(java.util.Locale.ROOT)).toList();
+            var words = fields.stream().flatMap(field -> java.util.Arrays.stream(SEARCH_WORD_SEPARATOR.split(field))).toList();
+            return terms.stream().allMatch(term -> fields.stream().anyMatch(field -> field.contains(term))
+                    || term.length() >= 4 && words.stream().anyMatch(word -> fuzzyMatch(word, term)));
+        }).toList();
+    }
+
+    private static boolean fuzzyMatch(String word, String query) {
+        int tolerance = Math.max(1, Math.max(word.length(), query.length()) / 3);
+        if (Math.abs(word.length() - query.length()) > tolerance) return false;
+        int[] previous = java.util.stream.IntStream.rangeClosed(0, query.length()).toArray();
+        for (int row = 1; row <= word.length(); row++) {
+            int[] current = new int[query.length() + 1];
+            current[0] = row;
+            for (int column = 1; column <= query.length(); column++) current[column] = Math.min(
+                    Math.min(current[column - 1] + 1, previous[column] + 1),
+                    previous[column - 1] + (word.charAt(row - 1) == query.charAt(column - 1) ? 0 : 1));
+            previous = current;
+        }
+        return previous[query.length()] <= tolerance;
+    }
+
+    private static Component searchButton() {
+        return Component.literal("[ ")
+                .append(Component.literal("🔎").withStyle(style -> style.withColor(ChatFormatting.AQUA)))
+                .append(Component.literal(" ]"))
+                .withStyle(style -> style.withColor(ChatFormatting.GRAY)
+                        .withHoverEvent(new HoverEvent.ShowText(Component.literal("Search discoveries")))
+                        .withClickEvent(new ClickEvent.RunCommand("/fusion collection search")));
     }
 
     private static Component pageArrow(String glyph, String tooltip, String command, boolean available) {
@@ -344,7 +418,44 @@ public final class DiscoveryBook {
                 : name.getString().length() > 32
                         ? Component.literal(shortText(name.getString(), 32)).setStyle(name.getStyle()) : name.copy();
         return label.withStyle(style -> style.withHoverEvent(
-                new HoverEvent.ShowItem(ItemStackTemplate.fromNonEmptyStack(stack))));
+                new HoverEvent.ShowItem(ItemStackTemplate.fromNonEmptyStack(displayStack(stack)))));
+    }
+
+    public static ItemStack displayStack(ItemStack stack) {
+        return FusionOrigin.strip(stack);
+    }
+
+    public static Component discovererLine(List<String> names) {
+        return discovererLine(names, 2);
+    }
+
+    public static Component discovererLine(List<String> names, int visibleNames) {
+        if (names.isEmpty()) return Component.empty();
+        var line = Component.empty()
+                .append(Component.literal("By ").withStyle(ChatFormatting.DARK_GRAY));
+        int shown = Math.min(Math.max(1, visibleNames), names.size());
+        for (int index = 0; index < shown; index++) {
+            if (index > 0) line.append(Component.literal(names.size() == 2 ? " and " : ", ")
+                    .withStyle(ChatFormatting.DARK_GRAY));
+            String name = names.get(index);
+            line.append(Component.object(new net.minecraft.network.chat.contents.objects.PlayerSprite(
+                    net.minecraft.world.item.component.ResolvableProfile.createUnresolved(name), true), Component.empty()))
+                    .append(Component.literal(" " + name).withStyle(ChatFormatting.DARK_GRAY));
+        }
+        if (names.size() > shown) {
+            var more = Component.empty();
+            for (int index = shown; index < names.size(); index++) {
+                if (index > shown) more.append("\n");
+                String name = names.get(index);
+                more.append(Component.object(new net.minecraft.network.chat.contents.objects.PlayerSprite(
+                        net.minecraft.world.item.component.ResolvableProfile.createUnresolved(name), true), Component.empty()))
+                        .append(Component.literal(" " + name).withStyle(ChatFormatting.GRAY));
+            }
+            int remaining = names.size() - shown;
+            line.append(Component.literal(" and " + remaining + " more").withStyle(style -> style
+                    .withColor(ChatFormatting.AQUA).withHoverEvent(new HoverEvent.ShowText(more))));
+        }
+        return line;
     }
 
     private static String shortText(String text, int limit) {

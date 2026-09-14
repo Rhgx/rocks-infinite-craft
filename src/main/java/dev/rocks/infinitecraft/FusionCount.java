@@ -18,6 +18,9 @@ final class FusionCount {
         var data = stack.get(DataComponents.CUSTOM_DATA);
         if (data == null) return -1;
         var tag = data.copyTag();
+        if (!FusionOrigin.valid(tag)) return -1;
+        tag.remove(FusionOrigin.FIRST);
+        tag.remove(FusionOrigin.SECOND);
         if (tag.size() != (tag.contains(ItemTraits.KEY) ? 2 : 1) || !(tag.get(KEY) instanceof NumericTag number)) return -1;
         if (tag.contains(ItemTraits.KEY)) {
             var traits = tag.getList(ItemTraits.KEY).orElse(null);
@@ -34,7 +37,12 @@ final class FusionCount {
     }
 
     static boolean supportedData(ItemStack stack) {
-        return !stack.has(DataComponents.CUSTOM_DATA) || get(stack) >= 0;
+        if (!stack.has(DataComponents.CUSTOM_DATA)) return true;
+        var tag = stack.get(DataComponents.CUSTOM_DATA).copyTag();
+        if (!FusionOrigin.valid(tag)) return false;
+        tag.remove(FusionOrigin.FIRST);
+        tag.remove(FusionOrigin.SECOND);
+        return tag.isEmpty() || get(stack) >= 0;
     }
 
     static boolean exhausted(ItemStack stack) { return get(stack) == LIMIT; }

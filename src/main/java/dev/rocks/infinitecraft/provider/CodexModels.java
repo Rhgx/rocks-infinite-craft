@@ -38,7 +38,7 @@ public final class CodexModels {
                 // Bound the whole exchange, including notifications and paginated responses.
                 int remaining = 1_048_576;
                 var models = new LinkedHashMap<String, Model>();
-                String request = "{\"id\":1,\"method\":\"initialize\",\"params\":{\"clientInfo\":{\"name\":\"infinitecraft\",\"version\":\"0.1.1\"}}}";
+                String request = "{\"id\":1,\"method\":\"initialize\",\"params\":{\"clientInfo\":{\"name\":\"infinitecraft\",\"version\":\"0.1.2\"}}}";
                 for (int id = 1; id <= 11; id++) {
                     output.write((request + "\n").getBytes(StandardCharsets.UTF_8));
                     output.flush();

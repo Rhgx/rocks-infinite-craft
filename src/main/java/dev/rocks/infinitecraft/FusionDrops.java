@@ -12,13 +12,13 @@ public final class FusionDrops {
     private FusionDrops() {}
 
     public static void mark(ItemEntity entity, boolean random, boolean trace) {
-        if (entity != null && !random && trace && InfiniteCraftMod.fusionEnabled(null)
+        if (entity != null && !random && trace && InfiniteCraftMod.groundFusionEnabled()
                 && entity.getItem().getCount() == 1) SINGLES.add(entity);
     }
 
     public static boolean intentional(ItemEntity entity) {
         return entity.level() instanceof net.minecraft.server.level.ServerLevel
-                && InfiniteCraftMod.fusionEnabled(null) && entity.getItem().getCount() == 1 && SINGLES.contains(entity);
+                && InfiniteCraftMod.groundFusionEnabled() && entity.getItem().getCount() == 1 && SINGLES.contains(entity);
     }
 
     static void clear() { SINGLES.clear(); }

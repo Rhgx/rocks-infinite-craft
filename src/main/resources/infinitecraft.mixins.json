@@ -7,7 +7,12 @@
     "BoundBookPlayerMixin",
     "BoundBookCreativeMixin",
     "FusionDropMixin",
-    "DiscoveryBookRecipeMixin"
+    "DiscoveryBookRecipeMixin",
+    "FusionCrafterBlockMixin",
+    "FusionCrafterDataMixin",
+    "FusionCrafterSlotsMixin",
+    "FusionCrafterMenuMixin",
+    "ContainerMenuAccess"
   ],
   "injectors": {
     "defaultRequire": 1

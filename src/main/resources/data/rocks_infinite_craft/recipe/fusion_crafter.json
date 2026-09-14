@@ -1,0 +1,34 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "minecraft:crafter",
+    "minecraft:amethyst_shard",
+    "minecraft:copper_ingot"
+  ],
+  "result": {
+    "id": "minecraft:crafter",
+    "count": 1,
+    "components": {
+      "minecraft:custom_name": {
+        "text": "Fusion Crafter",
+        "italic": false,
+        "color": "gold"
+      },
+      "minecraft:custom_data": {
+        "rocks_fusion_crafter": true
+      },
+      "minecraft:custom_model_data": {
+        "strings": [
+          "rocks_fusion_crafter"
+        ]
+      },
+      "minecraft:lore": [
+        {
+          "text": "Place items in two slots to fuse.",
+          "color": "gray",
+          "italic": false
+        }
+      ]
+    }
+  }
+}

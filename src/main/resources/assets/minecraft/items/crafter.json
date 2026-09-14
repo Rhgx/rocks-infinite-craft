@@ -1,0 +1,20 @@
+{
+  "model": {
+    "type": "minecraft:select",
+    "property": "minecraft:custom_model_data",
+    "index": 0,
+    "cases": [
+      {
+        "when": "rocks_fusion_crafter",
+        "model": {
+          "type": "minecraft:model",
+          "model": "rocks_infinite_craft:block/fusion_crafter"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:block/crafter"
+    }
+  }
+}

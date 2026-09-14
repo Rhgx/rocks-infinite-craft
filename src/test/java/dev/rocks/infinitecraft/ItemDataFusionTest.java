@@ -40,6 +40,9 @@ class ItemDataFusionTest {
         assertEquals(new PotionContents(Potions.WATER_BREATHING), potion.get(DataComponents.POTION_CONTENTS));
     }
     @Test void specialFusionCounterStartsAtZeroAndSurvivesPlainDescendants() {
+        var untouched = new ItemStack(Items.STONE);
+        assertTrue(ItemStack.matches(untouched, FusionOrigin.strip(untouched)));
+        assertTrue(ItemDataFusion.supported(FusionOrigin.strip(untouched)));
         assertEquals(-1, FusionCount.get(new ItemStack(Items.ENCHANTED_GOLDEN_APPLE)));
         assertEquals(-1, FusionCount.get(new ItemStack(Items.ENCHANTED_BOOK)));
         var vanillaPotion = new ItemStack(Items.POTION);
@@ -68,6 +71,20 @@ class ItemDataFusionTest {
 
 
         assertTrue(ItemDataFusion.supported(special));
+        var origin = new ItemStack(Items.TORCH);
+        assertTrue(FusionOrigin.apply(origin, new ItemStack(Items.STICK), new ItemStack(Items.COAL)));
+        assertEquals("Made from Stick + Coal", origin.get(DataComponents.LORE).lines().getLast().getString());
+        assertTrue(ItemDataFusion.supported(origin));
+        var strippedOrigin = FusionOrigin.strip(origin);
+        assertFalse(strippedOrigin.has(DataComponents.CUSTOM_DATA));
+        assertTrue(strippedOrigin.getOrDefault(DataComponents.LORE,
+                net.minecraft.world.item.component.ItemLore.EMPTY).lines().isEmpty());
+        assertTrue(strippedOrigin.getComponentsPatch().isEmpty());
+        var chestBoat = new ItemStack(Items.BIRCH_CHEST_BOAT);
+        assertTrue(FusionOrigin.apply(chestBoat, new ItemStack(Items.BIRCH_STAIRS), new ItemStack(Items.BIRCH_SLAB)));
+        var strippedChestBoat = FusionOrigin.strip(chestBoat);
+        assertTrue(ItemDataFusion.supported(strippedChestBoat));
+        assertTrue(strippedChestBoat.getComponentsPatch().isEmpty());
         var lineage = new java.util.ArrayList<ItemStack>();
         var descendant = special;
         for (int count = 1; count <= 5; count++) {

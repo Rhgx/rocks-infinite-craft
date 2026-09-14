@@ -12,6 +12,9 @@
     ],
     "modmenu": [
       "dev.rocks.infinitecraft.client.InfiniteCraftModMenu"
+    ],
+    "client": [
+      "dev.rocks.infinitecraft.client.FusionCrafterModels"
     ]
   },
   "suggests": {

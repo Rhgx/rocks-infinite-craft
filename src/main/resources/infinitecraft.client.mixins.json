@@ -4,7 +4,10 @@
   "compatibilityLevel": "JAVA_25",
   "client": [
     "DiscoveryItemDisplayMixin",
-    "FusionEnableClickMixin"
+    "FusionEnableClickMixin",
+    "FusionCrafterHoverMixin",
+    "FusionCrafterRenderDataMixin",
+    "FusionCrafterScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1
