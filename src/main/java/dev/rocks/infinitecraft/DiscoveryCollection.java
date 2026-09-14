@@ -48,7 +48,11 @@ public final class DiscoveryCollection {
 
     /** Immediate-parent lore is presentation metadata, so it does not split one result into several outputs. */
     public record ResultKey(ItemStack stack) {
-        public ResultKey { stack = FusionOrigin.strip(stack).copyWithCount(1); }
+        public ResultKey {
+            stack = FusionOrigin.strip(stack).copyWithCount(1);
+            stack.remove(net.minecraft.core.component.DataComponents.DAMAGE);
+            stack.remove(net.minecraft.core.component.DataComponents.REPAIR_COST);
+        }
         @Override public int hashCode() { return ItemStack.hashItemAndComponents(stack); }
         @Override public boolean equals(Object other) {
             return other instanceof ResultKey key && ItemStack.isSameItemSameComponents(stack, key.stack);
@@ -96,10 +100,10 @@ public final class DiscoveryCollection {
         var indexes = new java.util.LinkedHashMap<RecipeKey, Integer>();
         var uniqueEntries = new ArrayList<Entry>();
         var uniquePlayers = new ArrayList<java.util.Set<java.util.UUID>>();
+        boolean changed = false;
         for (int index = 0; index < entries.size(); index++) {
             var entry = entries.get(index);
-            var key = new RecipeKey(new ResultKey(entry.result()), new ResultKey(entry.first()),
-                    new ResultKey(entry.second()));
+            var key = new RecipeKey(new ResultKey(entry.result()), new ResultKey(entry.first()), new ResultKey(entry.second()));
             var existingIndex = indexes.get(key);
             if (existingIndex == null) {
                 indexes.put(key, uniqueEntries.size());
@@ -114,8 +118,9 @@ public final class DiscoveryCollection {
             uniqueEntries.set(existingIndex, new Entry(existing.first(), existing.second(), existing.result(),
                     existing.discoverer(), existing.id(), names));
             uniquePlayers.get(existingIndex).addAll(players.get(index));
+            changed = true;
         }
-        if (uniqueEntries.size() == entries.size()) return false;
+        if (!changed) return false;
         entries.clear();
         entries.addAll(uniqueEntries);
         players.clear();
@@ -205,6 +210,21 @@ public final class DiscoveryCollection {
         var otherSecondKey = new ResultKey(otherSecond);
         return firstKey.equals(otherFirstKey) && secondKey.equals(otherSecondKey)
                 || firstKey.equals(otherSecondKey) && secondKey.equals(otherFirstKey);
+    }
+
+    record InputPair(ItemStack first, ItemStack second) {}
+
+    /** Reversed inputs follow the earliest discovered orientation for their component-aware pair. */
+    InputPair normalize(ItemStack first, ItemStack second) {
+        var firstKey = new ResultKey(first);
+        var secondKey = new ResultKey(second);
+        for (var entry : entries) {
+            var storedFirst = new ResultKey(entry.first());
+            var storedSecond = new ResultKey(entry.second());
+            if (storedFirst.equals(firstKey) && storedSecond.equals(secondKey)) return new InputPair(first, second);
+            if (storedFirst.equals(secondKey) && storedSecond.equals(firstKey)) return new InputPair(second, first);
+        }
+        return new InputPair(first, second);
     }
 
     private String encode(Entry entry, java.util.Set<java.util.UUID> owners) {

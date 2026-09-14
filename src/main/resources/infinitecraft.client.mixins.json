@@ -3,6 +3,7 @@
   "package": "dev.rocks.infinitecraft.client.mixin",
   "compatibilityLevel": "JAVA_25",
   "client": [
+    "CreativeModeInventoryScreenAccess",
     "DiscoveryItemDisplayMixin",
     "FusionEnableClickMixin",
     "FusionCrafterHoverMixin",

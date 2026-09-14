@@ -246,14 +246,14 @@ final class FusionCrafter implements AutoCloseable {
                     var result = job.resolution().join();
                     var first = station.items.get(slots.get(0));
                     var second = station.items.get(slots.get(1));
-                    var output = runtime.outputFor(result, first, second, job.dataFirst(), job.dataSecond());
+                    var output = runtime.outputFor(result, job.inputFirst(), job.inputSecond(), job.dataFirst(), job.dataSecond());
                     if (output.isEmpty()) throw new IllegalArgumentException("Fusion result unavailable.");
                     exchange(block, world, slots, output, result.count(), player);
                     station.preview = output.copy();
                     station.items = block.getItems().stream().map(ItemStack::copy).toList();
                     station.attempted = false;
                     station.stable = 0;
-                    runtime.recordDiscovery(first, second, output, player);
+                    runtime.recordDiscovery(job.inputFirst(), job.inputSecond(), output, player);
                     feedback(world, block, runtime.isSpecial(output), true);
                     station.user = null;
                 } catch (java.util.concurrent.CompletionException | IllegalArgumentException error) {

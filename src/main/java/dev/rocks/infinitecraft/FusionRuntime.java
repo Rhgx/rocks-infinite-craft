@@ -431,6 +431,7 @@ public final class FusionRuntime implements AutoCloseable {
         reserved.put(b.getUUID(), token);
         combining.put(token, new CombiningVisual(world, player.getUUID(), a.getUUID(), b.getUUID(), prepared.key()));
         pending++;
+        ItemStack inputFirst = prepared.inputFirst(), inputSecond = prepared.inputSecond();
         ItemStack preservedFirst = prepared.dataFirst(), preservedSecond = prepared.dataSecond();
         var resolution = prepared.resolution();
         resolution.whenComplete((result, error) -> {
@@ -465,7 +466,7 @@ public final class FusionRuntime implements AutoCloseable {
                             || a.distanceToSqr(player) > 100 || !ItemStack.matches(liveFirst, a.getItem())
                             || !ItemStack.matches(liveSecond, b.getItem()) || !allowed.contains(result.itemId())) return;
                     try {
-                        if (!exchange(world, a, b, result, player, preservedFirst, preservedSecond)) {
+                        if (!exchange(world, a, b, result, player, inputFirst, inputSecond, preservedFirst, preservedSecond)) {
                             deny(world, player, a, b, "Fusion result unavailable.");
                         }
                     }
@@ -481,12 +482,15 @@ public final class FusionRuntime implements AutoCloseable {
         });
     }
 
-    record PreparedFusion(CompletableFuture<RecipeResult> resolution, String key,
+    record PreparedFusion(CompletableFuture<RecipeResult> resolution, String key, ItemStack inputFirst, ItemStack inputSecond,
             ItemStack dataFirst, ItemStack dataSecond) {}
 
     PreparedFusion prepareFusion(ItemStack liveFirst, ItemStack liveSecond) {
-        ItemStack first = FusionOrigin.strip(liveFirst);
-        ItemStack second = FusionOrigin.strip(liveSecond);
+        var normalized = discoveries.normalize(FusionOrigin.strip(liveFirst), FusionOrigin.strip(liveSecond));
+        ItemStack first = normalized.first();
+        ItemStack second = normalized.second();
+        ItemStack identityFirst = new DiscoveryCollection.ResultKey(first).stack();
+        ItemStack identitySecond = new DiscoveryCollection.ResultKey(second).stack();
         // Only crafted lineage markers count here, not ingredients that merely trigger special generation.
         if (!config.combineSpecialItems && FusionCount.get(first) >= 0 && FusionCount.get(second) >= 0) {
             throw new IllegalArgumentException("Combining special items is disabled.");
@@ -504,7 +508,7 @@ public final class FusionRuntime implements AutoCloseable {
                 || !allowed.contains(firstId) || !allowed.contains(secondId)) {
             throw new IllegalArgumentException("Unsupported ingredients.");
         }
-        boolean hasData = !first.getComponentsPatch().isEmpty() || !second.getComponentsPatch().isEmpty();
+        boolean hasData = !identityFirst.getComponentsPatch().isEmpty() || !identitySecond.getComponentsPatch().isEmpty();
         RecipeResult known;
         try { known = engine.knownRecipe(firstId, secondId, overrides).orElse(null); }
         catch (IllegalStateException error) {
@@ -515,21 +519,21 @@ public final class FusionRuntime implements AutoCloseable {
                 && (isSpecial(first) || isSpecial(second));
         boolean generateVariant = hasData && !overrides.containsKey(dev.rocks.infinitecraft.core.PairKey.of(firstId, secondId));
         String failureKey;
-        try { failureKey = hasData ? componentFailureKey(first, second) : ""; }
+        try { failureKey = hasData ? componentFailureKey(identityFirst, identitySecond) : ""; }
         catch (RuntimeException error) { throw new IllegalArgumentException("Unsupported item data."); }
         var variant = generateVariant ? engine.knownVariant(failureKey).orElse(null) : null;
         var saved = generateVariant ? cachedVariantOrBase(variant, known,
                 recipe -> compatibleOutput(recipe.itemId(), first, second)) : known;
         if (generateVariant && saved == known && known != null) generateVariant = false;
         boolean needsGeneration = saved == null;
-        Set<String> compatibleIds = hasData ? compatibleOutputs(first, second, saved) : allowed;
+        Set<String> compatibleIds = hasData ? compatibleOutputs(identityFirst, identitySecond, saved) : allowed;
         ItemStack dataFirst = first, dataSecond = second;
         int dataPriority = 0;
         if (compatibleIds.isEmpty()) {
             var ops = server.registryAccess().createSerializationContext(com.mojang.serialization.JsonOps.INSTANCE);
             boolean firstWins = ComponentPairKey.firstWins(
-                    ItemStack.CODEC.encodeStart(ops, first.copyWithCount(1)).getOrThrow(),
-                    ItemStack.CODEC.encodeStart(ops, second.copyWithCount(1)).getOrThrow(), server.overworld().getSeed());
+                    ItemStack.CODEC.encodeStart(ops, identityFirst).getOrThrow(),
+                    ItemStack.CODEC.encodeStart(ops, identitySecond).getOrThrow(), server.overworld().getSeed());
             dataPriority = firstWins ? 1 : 2;
             dataFirst = firstWins ? first : ItemStack.EMPTY;
             dataSecond = firstWins ? ItemStack.EMPTY : second;
@@ -556,7 +560,7 @@ public final class FusionRuntime implements AutoCloseable {
                 : engine.resolve(request, overrides, allowed, validator);
         return new PreparedFusion(resolution,
                 generateVariant ? failureKey : dev.rocks.infinitecraft.core.PairKey.of(firstId, secondId),
-                preservedFirst, preservedSecond);
+                first, second, preservedFirst, preservedSecond);
     }
 
     private Set<String> compatibleOutputs(ItemStack first, ItemStack second, RecipeResult saved) {
@@ -674,9 +678,9 @@ public final class FusionRuntime implements AutoCloseable {
     }
 
     private boolean exchange(ServerLevel world, ItemEntity a, ItemEntity b, RecipeResult result, ServerPlayer player,
-            ItemStack dataFirst, ItemStack dataSecond) {
+            ItemStack inputFirst, ItemStack inputSecond, ItemStack dataFirst, ItemStack dataSecond) {
         if (a == b || a.getItem().isEmpty() || b.getItem().isEmpty()) return false;
-        ItemStack output = outputFor(result, a.getItem(), b.getItem(), dataFirst, dataSecond);
+        ItemStack output = outputFor(result, inputFirst, inputSecond, dataFirst, dataSecond);
         if (output.isEmpty()) return false;
         var midpoint = a.position().add(b.position()).scale(0.5);
         List<ItemEntity> spawned = new ArrayList<>();
@@ -709,7 +713,7 @@ public final class FusionRuntime implements AutoCloseable {
         if (a.getItem().isEmpty()) a.discard();
         if (b.getItem().isEmpty()) b.discard();
         for (ItemEntity entity : spawned) cooldowns.put(entity.getUUID(), ticks + config.cooldownTicks);
-        recordDiscovery(beforeA, beforeB, output, player);
+        recordDiscovery(inputFirst, inputSecond, output, player);
         try {
             boolean special = isSpecial(output);
             if (config.successSound) world.playSound(null, midpoint.x, midpoint.y, midpoint.z,

@@ -103,6 +103,10 @@ class DiscoveryCollectionTest {
         var originatedSteak = plainSteak.copy();
         assertTrue(FusionOrigin.apply(originatedSteak, new ItemStack(Items.BEEF), new ItemStack(Items.CAMPFIRE)));
         assertTrue(DiscoveryCollection.samePair(plainSteak, plainSteak, plainSteak, originatedSteak));
+        var damagedAxe = new ItemStack(Items.WOODEN_AXE);
+        damagedAxe.setDamageValue(5);
+        assertEquals(new DiscoveryCollection.ResultKey(new ItemStack(Items.WOODEN_AXE)),
+                new DiscoveryCollection.ResultKey(damagedAxe));
         assertEquals(1, DiscoveryCollection.groupResults(personalReload.entries(rocks, "RenamedRocks"))
                 .get(new DiscoveryCollection.ResultKey(originalOutput)).size());
         assertFalse(personalReload.record(second, new ItemStack(Items.DIRT), originalOutput, "Friend", friend));
@@ -112,6 +116,16 @@ class DiscoveryCollectionTest {
         var finalReload = new DiscoveryCollection(file, lookup);
         assertEquals(3, finalReload.entries().size());
         assertEquals(List.of("Rocks", "Friend"), finalReload.entries().getFirst().discoverers());
+        var ordered = new DiscoveryCollection(directory.resolve("ordered.json"), lookup);
+        ordered.record(new ItemStack(Items.WOODEN_AXE), new ItemStack(Items.ENCHANTED_GOLDEN_APPLE),
+                new ItemStack(Items.GOLDEN_AXE), "Rocks");
+        assertTrue(ordered.entries().getFirst().first().is(Items.WOODEN_AXE));
+        var normalized = ordered.normalize(new ItemStack(Items.ENCHANTED_GOLDEN_APPLE), new ItemStack(Items.WOODEN_AXE));
+        assertTrue(normalized.first().is(Items.WOODEN_AXE));
+        assertTrue(normalized.second().is(Items.ENCHANTED_GOLDEN_APPLE));
+        ordered.save(ordered.snapshot());
+        var orderedReload = new DiscoveryCollection(directory.resolve("ordered.json"), lookup);
+        assertTrue(orderedReload.entries().getFirst().first().is(Items.WOODEN_AXE));
     }
 
     @Test void malformedCollectionIsNeverOverwrittenOnLoad() throws Exception {
