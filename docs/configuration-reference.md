@@ -34,7 +34,7 @@ Special results can have styled names, dyed equipment, a different vanilla item 
 
 | Setting | Options |
 | --- | --- |
-| Book ownership | **Soulbound** by default: automatically given while fusion is on, cannot be dropped or stored, replaced after death. **Craftable**: book + cobblestone anywhere in the grid; droppable and has no vanishing curse. The recipe unlocks when you obtain a normal book. |
+| Book ownership | **Soulbound** by default: automatically given while fusion is on, cannot be dropped or stored, replaced after death. **Craftable**: book + copper ingot anywhere in the grid; droppable and has no vanishing curse. The recipe unlocks when you obtain a normal book. |
 | Book visibility | **Global** by default: everyone's discoveries, with discoverer names. **Personal**: only results you have made, without the name line. |
 
 Books show 25 discoveries per page, newest first. Hover items for their tooltips. Personal books also have **Share**, which posts the recipe in chat and closes the book. Sharing has a three-second cooldown.

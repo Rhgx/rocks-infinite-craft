@@ -1,8 +1,8 @@
 {
   "type": "minecraft:crafting_shapeless",
   "ingredients": [
-    "minecraft:crafter",
     "minecraft:amethyst_shard",
+    "minecraft:crafter",
     "minecraft:copper_ingot"
   ],
   "result": {

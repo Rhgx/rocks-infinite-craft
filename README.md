@@ -3,9 +3,9 @@
 # Rocks' Infinite Craft
 
 <p>
-  <a href="https://github.com/Rhgx/rocks-infinite-craft/releases/latest"><img alt="Available on GitHub" height="40" src="https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/compact/available/github_vector.svg"></a>
-  <a href="https://fabricmc.net/use/installer/"><img alt="Supports Fabric" height="40" src="https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/compact/supported/fabric_vector.svg"></a>
-  <a href="https://adoptium.net/temurin/releases/?version=25"><img alt="Built with Java 25" height="40" src="https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/compact/built-with/java25_vector.svg"></a>
+  <a href="https://github.com/Rhgx/rocks-infinite-craft/releases/latest"><img alt="Available on GitHub" height="56" src="https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/available/github_vector.svg"></a>
+  <a href="https://fabricmc.net/use/installer/"><img alt="Supports Fabric" height="56" src="https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/supported/fabric_vector.svg"></a>
+  <a href="https://adoptium.net/temurin/releases/?version=25"><img alt="Built with Java 25" height="56" src="https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/built-with/java25_vector.svg"></a>
 </p>
 
 Drop two items. Discover something new.
@@ -30,11 +30,23 @@ Recipes are saved per world. Repeating a combination reuses its result instead o
 4. Choose your provider and model, test the connection, then enable recipe generation.
 5. Run `/fusion enable`, then drop two items next to each other, one at a time. Two of the same item work too.
 
-The host toggles fusion, and the setting persists per world. By default, everyone gets a soulbound Discovery Book while fusion is enabled. Switch **Book ownership** to **Craftable** to use a book + cobblestone recipe instead; crafted books can be dropped and have no vanishing curse. **Book visibility** can be **Global** or **Personal**, showing only recipes you have made in personal mode.
+The host toggles fusion, and the setting persists per world. By default, everyone gets a soulbound Discovery Book while fusion is enabled. Switch **Book ownership** to **Craftable** to use a book + copper ingot recipe instead; crafted books can be dropped and have no vanishing curse. **Book visibility** can be **Global** or **Personal**, showing only recipes you have made in personal mode.
 
-Vanilla guests do not need this mod, but other gameplay mods may still require matching client installations.
+Vanilla guests do not need the mod, though installing it is recommended for the best experience.
 
 Hosted providers may charge for requests. API keys are stored in the host's local configuration.
+
+## Crafting recipes
+
+Both recipes are shapeless, so the items can go anywhere in the crafting grid.
+
+### Discovery Book
+
+![A book and copper ingot crafting a Discovery Book](docs/recipes/discovery-book.png)
+
+### Fusion Crafter
+
+![An amethyst shard, Crafter, and copper ingot crafting a Fusion Crafter](docs/recipes/fusion-crafter.png)
 
 ## Documentation
 
