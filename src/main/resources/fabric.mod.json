@@ -3,7 +3,7 @@
   "id": "rocks_infinite_craft",
   "version": "${version}",
   "name": "Rocks' Infinite Craft",
-  "license": "GPL-3.0-only",
+  "license": "MIT",
   "description": "Drop two items together and see what you get. Like Infinite Craft, but in Minecraft.",
   "environment": "*",
   "entrypoints": {

@@ -71,7 +71,7 @@ GitHub Actions builds and tests each push and pull request. Releases use the tag
 
 ## License
 
-Licensed under [GPLv3](LICENSE). Third-party textures and logos retain their respective licenses.
+Licensed under the [MIT License](LICENSE). Third-party textures and logos retain their respective licenses.
 
 ## Credits
 
