@@ -1,6 +1,6 @@
 {
   "type": "minecraft:crafting_shapeless",
-  "ingredients": ["minecraft:book", "minecraft:cobblestone"],
+  "ingredients": ["minecraft:book", "minecraft:copper_ingot"],
   "result": {
     "id": "minecraft:knowledge_book",
     "count": 1,

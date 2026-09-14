@@ -70,7 +70,7 @@ class DiscoveryBookTest {
         var recipe = (net.minecraft.world.item.crafting.ShapelessRecipe) net.minecraft.world.item.crafting.Recipe.CODEC
                 .parse(ops, recipeJson).getOrThrow();
         assertTrue(ItemStack.isSameItemSameComponents(craftable, recipe.assemble(
-                net.minecraft.world.item.crafting.CraftingInput.of(2, 1, List.of(new ItemStack(Items.BOOK), new ItemStack(Items.COBBLESTONE))))));
+                net.minecraft.world.item.crafting.CraftingInput.of(2, 1, List.of(new ItemStack(Items.BOOK), new ItemStack(Items.COPPER_INGOT))))));
     }
 
     @Test void offhandBookIsRetainedWithoutDuplicatesAndDisabledFusionClearsBoth() {
