@@ -16,5 +16,6 @@ Before a release, check in-game:
 4. Try global/personal and soulbound/craftable books. Check navigation, tooltips, Share, offhand movement, dropping, and respawning.
 5. Try generated food, worn items, enchantments, potions, and the five-combination limit.
 6. Invite a vanilla client and check fusion, books, effects, and host-only controls.
+7. Craft a Fusion Crafter with an Amethyst Shard and Copper Ingot. Try two slots, identical inputs, stacks, removing an input during generation, and a failed combination. Break and replace it, then reopen the world. Check both fusion toggles and the appearance with and without the optional pack.
 
 Close Minecraft before replacing its loaded mod JAR.

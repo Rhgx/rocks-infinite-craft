@@ -8,6 +8,11 @@ The host controls fusion with `/fusion enable`, `/fusion disable`, or `/fusion t
 
 Drop two items individually near each other. Two identical items work too. Dropping an entire stack does not start fusion. Failed combinations leave the items intact.
 
+Alternatively, craft a **Fusion Crafter** from a Crafter, Amethyst Shard and Copper Ingot.
+Put items in two separate slots; fusion starts automatically after one second. Ground fusion
+and Fusion Crafter have independent Gameplay toggles, both on by default. See the
+[workstation guide](fusion-crafter/README.md) for details.
+
 Generation starts disabled. Saved and data-pack recipes work without a model request. See [provider setup](providers.md) to enable new recipes.
 
 ## Gameplay settings
@@ -40,13 +45,14 @@ Personal collections use the world's shared recipe cache. Making a known recipe 
 
 Toggle success/failure sounds and particles, and the combining animation. First discoveries, special discoveries, join messages, milestones, and queue feedback have separate toggles.
 
-Milestones follow 10, 25, 50, 100, 250, 500, and the same pattern at larger scales. Queued requests show `Fusion queued... (X/Y)`.
+Milestones follow 10, 25, 50, 100, 250, 500, and the same pattern at larger scales. Their formatting and XP reward grow with the collection, with XP capped at 500 per milestone. Queued requests show `Fusion queued... (X/Y)`.
 
 ## Advanced limits
 
 | Config field | Default | Range |
 | --- | ---: | ---: |
 | `generationAttempts` | 3 | 1–4 |
+| `generationThreads` | 1 | 1–8 |
 | `provider.timeoutSeconds` | 60 | 1–300 |
 | `scanIntervalTicks` | 10 | 1–200 |
 | `maxNearbyItems` | 64 | 2–256 |

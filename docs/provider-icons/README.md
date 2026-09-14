@@ -14,5 +14,3 @@ SVG sources retrieved 2026-09-12:
 Simple Icons uses CC0; Lobe Icons uses MIT. License texts accompany these sources and are bundled with the PNGs. Brand marks belong to their respective owners.
 
 The approved PNGs live in `src/main/resources/assets/rocks_infinite_craft/textures/gui/providers/`. `preview.png` shows those exact assets. The SVGs here are their editable sources; Ollama and Compatible also received small pixel cleanups.
-
-Run `python docs/provider-icons/render.py` from the project directory to generate reference renders in `build/provider-icons/`. It does not overwrite approved artwork. Requires Pillow, numpy and resvg-py only in the asset-building environment.
