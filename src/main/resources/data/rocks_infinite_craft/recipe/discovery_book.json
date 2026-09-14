@@ -7,7 +7,8 @@
     "components": {
       "minecraft:custom_name": {"text": "Discovery Book", "color": "#FFAA00", "italic": false},
       "minecraft:max_stack_size": 1,
-      "minecraft:custom_data": {"infinitecraft_discovery_book": true}
+      "minecraft:custom_data": {"infinitecraft_discovery_book": true},
+      "minecraft:custom_model_data": {"strings": ["rocks_discovery_book"]}
     }
   }
 }

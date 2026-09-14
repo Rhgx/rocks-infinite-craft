@@ -105,6 +105,8 @@ public final class DiscoveryBook {
         var marker = new CompoundTag();
         marker.putBoolean(MARKER, true);
         stack.set(DataComponents.CUSTOM_DATA, CustomData.of(marker));
+        stack.set(DataComponents.CUSTOM_MODEL_DATA, new net.minecraft.world.item.component.CustomModelData(
+                List.of(), List.of(), List.of("rocks_discovery_book"), List.of()));
         stack.set(DataComponents.CUSTOM_NAME, Component.literal("Discovery Book").withStyle(style -> style.withColor(0xFFAA00).withItalic(false)));
         stack.set(DataComponents.MAX_STACK_SIZE, 1);
         if (!soulbound) return stack;
