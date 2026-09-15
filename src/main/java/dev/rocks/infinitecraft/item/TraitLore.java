@@ -1,6 +1,7 @@
 package dev.rocks.infinitecraft.item;
 
 import dev.rocks.infinitecraft.fusion.FusionCount;
+import dev.rocks.infinitecraft.traits.TraitDefinition;
 import dev.rocks.infinitecraft.traits.TraitRegistry;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
@@ -11,15 +12,26 @@ import net.minecraft.world.item.component.ItemLore;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /** Hint at how an item can be used without revealing its effect. */
 public final class TraitLore {
     private static final Map<String, Component> LINES = TraitRegistry.definitions().stream()
             .filter(trait -> !trait.hint().isEmpty())
-            .collect(java.util.stream.Collectors.toUnmodifiableMap(trait -> trait.id(), trait -> line(trait.hint())));
+            .collect(Collectors.toUnmodifiableMap(
+                    TraitDefinition::id, trait -> line(trait.hint(), trait.hintColor())));
+    private static final Map<String, Component> ACTIVATION_LINES = Map.of(
+            "Edible", line("Edible", ChatFormatting.GREEN),
+            "Wearable", line("Wearable", ChatFormatting.AQUA),
+            "Offhand", line("Offhand", ChatFormatting.YELLOW));
+    private static final Set<String> HINT_TEXT = TraitRegistry.definitions().stream()
+            .map(TraitDefinition::hint)
+            .filter(hint -> !hint.isEmpty())
+            .collect(Collectors.toUnmodifiableSet());
 
-    private static Component line(String text) {
-        return Component.literal(text).withStyle(style -> style.withColor(ChatFormatting.GRAY).withItalic(false));
+    private static Component line(String text, ChatFormatting color) {
+        return Component.literal(text).withStyle(style -> style.withColor(color).withItalic(false));
     }
 
     public static boolean add(ItemStack stack, List<String> traits) {
@@ -31,7 +43,7 @@ public final class TraitLore {
         boolean offhand = stack.getOrDefault(DataComponents.ATTRIBUTE_MODIFIERS,
                 net.minecraft.world.item.component.ItemAttributeModifiers.EMPTY).modifiers().stream()
                 .anyMatch(entry -> entry.slot() == net.minecraft.world.entity.EquipmentSlotGroup.OFFHAND);
-        if (!offhand) lines.remove(line("Offhand"));
+        if (!offhand) lines.removeIf(line -> line.getString().equals("Offhand"));
         for (String trait : traits) {
             Component line = LINES.get(trait);
             if (line != null && !lines.contains(line)) lines.add(line);
@@ -43,7 +55,8 @@ public final class TraitLore {
                 case "offhand" -> "Offhand";
                 default -> "";
             };
-            if (!hint.isEmpty() && !lines.contains(line(hint))) lines.add(line(hint));
+            Component line = ACTIVATION_LINES.get(hint);
+            if (line != null && !lines.contains(line)) lines.add(line);
         }
         if (lines.size() > ItemLore.MAX_LINES) return false;
         if (!lines.isEmpty() || stack.has(DataComponents.LORE)) stack.set(DataComponents.LORE, new ItemLore(lines));
@@ -65,15 +78,22 @@ public final class TraitLore {
     }
 
     private static boolean isHint(Component value) {
-        return LINES.containsValue(value) || List.of(line("Offhand"), line("Edible"), line("Wearable")).contains(value);
+        return HINT_TEXT.contains(value.getString()) || ACTIVATION_LINES.containsKey(value.getString());
     }
 
     private static List<Component> deduplicatedLines(ItemStack stack) {
         List<Component> result = new ArrayList<>();
         for (Component line : stack.getOrDefault(DataComponents.LORE, ItemLore.EMPTY).lines()) {
             if (FusionCount.get(stack) >= 0 && FusionCount.isCounterLine(line)) continue;
-            if (!isHint(line) || !result.contains(line)) result.add(line);
+            Component normalized = normalizedHint(line);
+            if (normalized == null || !result.contains(normalized)) result.add(normalized == null ? line : normalized);
         }
         return result;
+    }
+
+    private static Component normalizedHint(Component line) {
+        Component activation = ACTIVATION_LINES.get(line.getString());
+        if (activation != null) return activation;
+        return LINES.values().stream().filter(hint -> hint.getString().equals(line.getString())).findFirst().orElse(null);
     }
 }

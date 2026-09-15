@@ -1,5 +1,6 @@
 package dev.rocks.infinitecraft.traits;
 
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.world.item.ItemStack;
 
@@ -34,6 +35,10 @@ public interface TraitDefinition {
 
     default String hint() {
         return "";
+    }
+
+    default ChatFormatting hintColor() {
+        return ChatFormatting.GRAY;
     }
 
     default Set<String> conflicts() {

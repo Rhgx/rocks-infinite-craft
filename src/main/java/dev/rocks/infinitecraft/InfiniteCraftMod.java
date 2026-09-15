@@ -6,6 +6,7 @@ import dev.rocks.infinitecraft.discovery.DiscoveryScreenPayload;
 import dev.rocks.infinitecraft.discovery.SpecialItemsTab;
 import dev.rocks.infinitecraft.fusion.FusionCrafterBlock;
 import dev.rocks.infinitecraft.fusion.FusionRuntime;
+import dev.rocks.infinitecraft.traits.CombatTraits;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
@@ -94,6 +95,7 @@ public final class InfiniteCraftMod implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        CombatTraits.initialize();
         SpecialItemsTab.initialize();
         DiscoveryScreenPayload.initialize();
         net.fabricmc.fabric.api.event.lifecycle.v1.ServerBlockEntityEvents.BLOCK_ENTITY_LOAD.register((block, world) -> {

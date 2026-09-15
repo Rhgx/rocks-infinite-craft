@@ -1,5 +1,6 @@
 package dev.rocks.infinitecraft.traits;
 
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.food.FoodProperties;
@@ -19,6 +20,11 @@ public abstract class FoodTrait implements TraitDefinition {
     @Override
     public String hint() {
         return "Edible";
+    }
+
+    @Override
+    public ChatFormatting hintColor() {
+        return ChatFormatting.GREEN;
     }
 
     @Override

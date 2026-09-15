@@ -1,6 +1,7 @@
 package dev.rocks.infinitecraft.traits;
 
 import dev.rocks.infinitecraft.core.ValidationPatterns;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -61,6 +62,9 @@ public final class TraitRegistry {
                     () -> Attributes.WATER_MOVEMENT_EFFICIENCY, ADD),
             new AttributeTrait("step_up", new StrengthRange(0, 1, .5),
                     () -> Attributes.STEP_HEIGHT, ADD),
+            new TriggeredTrait("explosive", "Volatile", ChatFormatting.RED),
+            new TriggeredTrait("incendiary", "Burning", ChatFormatting.GOLD),
+            new TriggeredTrait("vampiric", "Bloodthirsty", ChatFormatting.DARK_RED),
             new BlockingTrait(),
             new GlidingTrait(),
             new HealingFoodTrait(),

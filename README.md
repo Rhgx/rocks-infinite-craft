@@ -15,8 +15,9 @@ An Infinite Craft-inspired Fabric mod for Minecraft 26.2.
 ## What you can do
 
 - Discover new combinations, some with custom names, traits, enchantments, and potion effects.
+- Find special items with effects such as explosive hits, ignition, and life steal.
 - Browse the Discovery Book, share recipes in chat, and reach world discovery milestones.
-- Tune item strength, silliness, which items count as special, sounds, and particles.
+- Tune item strength, silliness, special-item limits, sounds, and particles.
 
 Works with Ollama, Codex CLI, OpenAI, Anthropic, Gemini, OpenRouter, and compatible APIs.
 
