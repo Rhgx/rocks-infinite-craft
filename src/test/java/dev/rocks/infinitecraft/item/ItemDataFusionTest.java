@@ -100,7 +100,12 @@ class ItemDataFusionTest {
         }
         assertTrue(FusionCount.exhausted(descendant));
         assertFalse(FusionCount.apply(new ItemStack(Items.STONE), descendant, plain));
-        assertTrue(ItemDataFusion.prepare(new ItemStack(Items.STONE), descendant, plain, false).isEmpty());
+        assertFalse(ItemDataFusion.prepare(new ItemStack(Items.STONE), descendant, plain, false).isEmpty());
+        assertFalse(FusionCount.exhausted(descendant, 0));
+        var unlimited = new ItemStack(Items.STONE);
+        assertTrue(FusionCount.apply(unlimited, descendant, plain, ItemDataFusion::specialIngredient, 0));
+        assertEquals(6, FusionCount.get(unlimited));
+        assertEquals("Combinations: 6", unlimited.get(DataComponents.LORE).lines().getLast().getString());
         assertEquals(0, FusionCount.get(special));
         var merged = ItemDataFusion.prepare(new ItemStack(Items.STONE), lineage.get(0), lineage.get(1), false);
         assertFalse(merged.isEmpty());
@@ -115,13 +120,18 @@ class ItemDataFusionTest {
     }
 
     @Test void foreignAndMalformedCustomDataRemainUnsupported() {
-        for (int count : new int[] {-1, 6}) {
+        for (int count : new int[] {-1}) {
             var stack = new ItemStack(Items.STONE);
             var marker = new net.minecraft.nbt.CompoundTag();
             marker.putInt("infinitecraft_combinations", count);
             stack.set(DataComponents.CUSTOM_DATA, net.minecraft.world.item.component.CustomData.of(marker));
             assertFalse(ItemDataFusion.supported(stack));
         }
+        var fractional = new ItemStack(Items.STONE);
+        var fractionalMarker = new net.minecraft.nbt.CompoundTag();
+        fractionalMarker.putDouble("infinitecraft_combinations", 1.5);
+        fractional.set(DataComponents.CUSTOM_DATA, net.minecraft.world.item.component.CustomData.of(fractionalMarker));
+        assertFalse(ItemDataFusion.supported(fractional));
         var stack = new ItemStack(Items.KNOWLEDGE_BOOK);
         var marker = new net.minecraft.nbt.CompoundTag();
         marker.putBoolean("infinitecraft_discovery_book", true);

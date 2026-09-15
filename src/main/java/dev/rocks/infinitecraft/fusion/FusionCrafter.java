@@ -55,18 +55,6 @@ public final class FusionCrafter implements AutoCloseable {
         this.server = server;
     }
 
-
-
-
-
-
-
-
-
-
-
-
-
     private static final class Placeholder {
         static final ItemStack STACK = create();
         private static ItemStack create() {
@@ -109,8 +97,14 @@ public final class FusionCrafter implements AutoCloseable {
         if (station.job == null) station.user = player.getUUID();
     }
 
-    int pending() { return (int) active.stream().map(stations::get).filter(s -> s.job != null).count(); }
-    boolean uses(String key) { return active.stream().map(stations::get).anyMatch(s -> s.job != null && s.job.key().equals(key)); }
+    int pending() {
+        return (int) active.stream().map(stations::get).filter(station -> station.job != null).count();
+    }
+
+    boolean uses(String key) {
+        return active.stream().map(stations::get)
+                .anyMatch(station -> station.job != null && station.job.key().equals(key));
+    }
 
     public static List<Integer> inputSlots(List<ItemStack> items) {
         var slots = new ArrayList<Integer>();

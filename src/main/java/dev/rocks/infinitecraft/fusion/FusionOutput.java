@@ -48,7 +48,9 @@ final class FusionOutput {
         if (output.isEmpty() || !applyDye(output, result.dyeColor()) || !applyModel(output, result.itemModel())) {
             return ItemStack.EMPTY;
         }
-        if (!FusionCount.apply(output, first, second, special)) return ItemStack.EMPTY;
+        if (!FusionCount.apply(output, first, second, special, config.specialCombinationLimit)) {
+            return ItemStack.EMPTY;
+        }
         if (!ItemTraits.apply(output, dataFirst, dataSecond, result.traits(), config.maxTraits)) return ItemStack.EMPTY;
         if (!FusionOrigin.apply(output, first, second)) return ItemStack.EMPTY;
         if (output.getCount() > output.getMaxStackSize()) return ItemStack.EMPTY;

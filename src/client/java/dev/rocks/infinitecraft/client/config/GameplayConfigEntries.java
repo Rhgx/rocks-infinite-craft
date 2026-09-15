@@ -39,6 +39,12 @@ final class GameplayConfigEntries {
         category.addEntry(special);
         fields.toggle(category, "Combine special items", config.combineSpecialItems, false,
                 "Allow two crafted special items to fuse together.", value -> config.combineSpecialItems = value);
+        var combinationLimit = fields.sliderEntry(
+                "Combination limit", config.specialCombinationLimit, 5, 0, 64,
+                "Maximum fusions carried through a special item's lineage.",
+                value -> Component.literal(value == 0 ? "Unlimited" : Integer.toString(value)),
+                value -> config.specialCombinationLimit = value);
+        category.addEntry(combinationLimit);
         var chance = fields.sliderEntry("Random chance", config.specialResultChance, 5, 0, 100,
                 "Chance of a special result.",
                 value -> Component.literal(value + "%"), value -> config.specialResultChance = value);

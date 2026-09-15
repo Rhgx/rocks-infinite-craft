@@ -40,7 +40,7 @@ public final class FusionCount {
         }
         int count = tag.getIntOr(KEY, -1);
         // JSON-backed world tools can round-trip a small integer as a byte; reject fractional numbers.
-        return count >= 0 && count <= LIMIT && number.doubleValue() == count ? count : -1;
+        return count >= 0 && number.doubleValue() == count ? count : -1;
     }
 
     public static boolean supportedData(ItemStack stack) {
@@ -53,35 +53,50 @@ public final class FusionCount {
     }
 
     public static boolean exhausted(ItemStack stack) {
-        return get(stack) == LIMIT;
+        return exhausted(stack, LIMIT);
+    }
+
+    public static boolean exhausted(ItemStack stack, int limit) {
+        return limit > 0 && get(stack) >= limit;
     }
 
     public static boolean isCounterLine(Component line) {
-        for (int count = 0; count <= LIMIT; count++) if (line.equals(line(count))) return true;
-        return false;
+        return line.getString().startsWith("Combinations: ");
     }
 
     private static Component line(int count) {
-        int color = count <= 2 ? 0xFFFFFF : count <= 4 ? 0xFFFF55 : 0xFF5555;
-        return Component.literal("Combinations: " + count + "/" + LIMIT)
+        return line(count, LIMIT);
+    }
+
+    private static Component line(int count, int limit) {
+        double progress = limit == 0 ? 0 : (double) count / limit;
+        int color = progress < 0.6 ? 0xFFFFFF : progress < 1 ? 0xFFFF55 : 0xFF5555;
+        String value = limit == 0 ? Integer.toString(count) : count + "/" + limit;
+        return Component.literal("Combinations: " + value)
                 .withStyle(style -> style.withColor(color).withItalic(false));
     }
 
     public static boolean apply(ItemStack output, ItemStack first, ItemStack second) {
-        return apply(output, first, second, ItemDataFusion::specialIngredient);
+        return apply(output, first, second, ItemDataFusion::specialIngredient, LIMIT);
     }
 
     public static boolean apply(ItemStack output, ItemStack first, ItemStack second, Predicate<ItemStack> special) {
-        if (exhausted(first) || exhausted(second) || !supportedData(output)) return false;
+        return apply(output, first, second, special, LIMIT);
+    }
+
+    public static boolean apply(ItemStack output, ItemStack first, ItemStack second,
+            Predicate<ItemStack> special, int limit) {
+        if (exhausted(first, limit) || exhausted(second, limit) || !supportedData(output)) return false;
         int firstCount = get(first), secondCount = get(second);
         boolean inherited = firstCount >= 0 || secondCount >= 0
                 || special.test(first) || special.test(second);
         if (!inherited && !special.test(output)) return true;
+        if (Math.max(firstCount, secondCount) == Integer.MAX_VALUE) return false;
         int count = inherited ? Math.max(0, Math.max(firstCount, secondCount)) + 1 : 0;
         var lines = new ArrayList<>(output.getOrDefault(DataComponents.LORE, ItemLore.EMPTY).lines());
         lines.removeIf(FusionCount::isCounterLine);
         if (lines.size() >= ItemLore.MAX_LINES) return false;
-        lines.add(line(count));
+        lines.add(line(count, limit));
         var marker = new CompoundTag();
         marker.putInt(KEY, count);
         output.set(DataComponents.CUSTOM_DATA, CustomData.of(marker));

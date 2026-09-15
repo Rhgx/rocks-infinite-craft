@@ -44,6 +44,7 @@ public final class ModConfig {
     public int generationThreads = 1;
     public int maxOutputCount = 8;
     public int maxTraits = 3;
+    public int specialCombinationLimit = 5;
     public int power = 50;
     public int silliness = 50;
     public int scanIntervalTicks = 10;
@@ -68,6 +69,7 @@ public final class ModConfig {
                 && specialCustomData == other.specialCustomData && generationAttempts == other.generationAttempts
                 && generationThreads == other.generationThreads
                 && maxOutputCount == other.maxOutputCount && maxTraits == other.maxTraits
+                && specialCombinationLimit == other.specialCombinationLimit
                 && power == other.power && silliness == other.silliness && maxPending == other.maxPending
                 && candidateLimit == other.candidateLimit;
     }
@@ -102,6 +104,7 @@ public final class ModConfig {
                 || generationThreads < 1 || generationThreads > 8
                 || power < 0 || power > 100 || silliness < 0 || silliness > 100
                 || maxTraits < 0 || maxTraits > 8
+                || specialCombinationLimit < 0 || specialCombinationLimit > 64
                 || maxOutputCount < 1 || maxOutputCount > 64
                 || specialResultChance < 0 || specialResultChance > 100)
             throw new IllegalArgumentException("Config limits are out of range");

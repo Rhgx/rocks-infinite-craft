@@ -530,8 +530,11 @@ public final class FusionRuntime implements AutoCloseable {
         if (!config.combineSpecialItems && FusionCount.get(first) >= 0 && FusionCount.get(second) >= 0) {
             throw new IllegalArgumentException("Combining special items is disabled.");
         }
-        if (FusionCount.exhausted(first) || FusionCount.exhausted(second)) {
-            throw new IllegalArgumentException("Combination limit reached (5/5).");
+        if (FusionCount.exhausted(first, config.specialCombinationLimit)
+                || FusionCount.exhausted(second, config.specialCombinationLimit)) {
+            throw new IllegalArgumentException(
+                    "Combination limit reached (" + config.specialCombinationLimit + "/"
+                            + config.specialCombinationLimit + ").");
         }
         if (ItemTraits.inherited(first, second).size() > config.maxTraits) {
             throw new IllegalArgumentException("Trait limit reached.");

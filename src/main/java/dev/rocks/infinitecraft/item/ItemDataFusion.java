@@ -81,7 +81,7 @@ public final class ItemDataFusion {
 
     /** Empty means data would be lost or incompatible. Inputs are never mutated. */
     public static ItemStack prepare(ItemStack target, ItemStack first, ItemStack second, boolean brewed) {
-        if (!supported(first) || !supported(second) || FusionCount.exhausted(first) || FusionCount.exhausted(second)) return ItemStack.EMPTY;
+        if (!supported(first) || !supported(second)) return ItemStack.EMPTY;
         ItemStack result = target.copy();
         if ((first.has(DataComponents.DYED_COLOR) || second.has(DataComponents.DYED_COLOR))
                 && result.is(net.minecraft.tags.ItemTags.CAULDRON_CAN_REMOVE_DYE)) {
