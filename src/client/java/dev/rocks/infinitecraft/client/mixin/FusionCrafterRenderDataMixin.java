@@ -8,7 +8,8 @@ import org.spongepowered.asm.mixin.Mixin;
 
 @Mixin(CrafterBlockEntity.class)
 abstract class FusionCrafterRenderDataMixin implements RenderDataBlockEntity {
-    @Override public Object getRenderData() {
+    @Override
+    public Object getRenderData() {
         // Immutable snapshot for the terrain renderer's worker threads.
         return InfiniteCraftMod.isFusionCrafter((BlockEntity) (Object) this);
     }

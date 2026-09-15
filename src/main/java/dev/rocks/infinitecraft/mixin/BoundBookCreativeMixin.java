@@ -1,9 +1,9 @@
 package dev.rocks.infinitecraft.mixin;
 
-import dev.rocks.infinitecraft.DiscoveryBook;
+import dev.rocks.infinitecraft.discovery.DiscoveryBook;
+import net.minecraft.network.protocol.game.ServerboundContainerClosePacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
-import net.minecraft.network.protocol.game.ServerboundContainerClosePacket;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;

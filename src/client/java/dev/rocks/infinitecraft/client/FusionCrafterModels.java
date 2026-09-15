@@ -1,7 +1,7 @@
 package dev.rocks.infinitecraft.client;
 
 import com.mojang.math.Quadrant;
-import java.util.function.Predicate;
+import dev.rocks.infinitecraft.client.discovery.DiscoveryBookClient;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.model.loading.v1.ModelLoadingPlugin;
 import net.fabricmc.fabric.api.client.model.loading.v1.wrapper.WrapperBlockStateModel;
@@ -21,11 +21,14 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
+import java.util.function.Predicate;
+
 /** Select baked terrain geometry once per chunk rebuild, including Sodium's rendering path. */
 public final class FusionCrafterModels implements ClientModInitializer {
     private static final Identifier MODEL = Identifier.fromNamespaceAndPath("rocks_infinite_craft", "block/fusion_crafter");
 
-    @Override public void onInitializeClient() {
+    @Override
+    public void onInitializeClient() {
         SpecialItemsTabClient.initialize();
         DiscoveryBookClient.initialize();
         ModelLoadingPlugin.register(plugin -> plugin.modifyBlockModelOnLoad().register((original, context) -> {
@@ -42,12 +45,15 @@ public final class FusionCrafterModels implements ClientModInitializer {
             if (orientation.front() == Direction.UP) turns = (turns + 2) % 4;
             var variant = new Variant(MODEL).withXRot(x).withYRot(Quadrant.values()[turns]);
             return new BlockStateModel.UnbakedRoot() {
-                @Override public void resolveDependencies(ResolvableModel.Resolver resolver) {
+                @Override
+                public void resolveDependencies(ResolvableModel.Resolver resolver) {
                     original.resolveDependencies(resolver);
                     variant.resolveDependencies(resolver);
                 }
-                @Override public Object visualEqualityGroup(BlockState state) { return original.visualEqualityGroup(state); }
-                @Override public BlockStateModel bake(BlockState state, ModelBaker baker) {
+                @Override
+                public Object visualEqualityGroup(BlockState state) { return original.visualEqualityGroup(state); }
+                @Override
+                public BlockStateModel bake(BlockState state, ModelBaker baker) {
                     return new StationModel(original.bake(state, baker), new SingleVariant(variant.bake(baker)));
                 }
             };
@@ -56,27 +62,37 @@ public final class FusionCrafterModels implements ClientModInitializer {
 
     private static final class StationModel extends WrapperBlockStateModel {
         private final BlockStateModel fusion;
-        StationModel(BlockStateModel vanilla, BlockStateModel fusion) { super(vanilla); this.fusion = fusion; }
+        StationModel(BlockStateModel vanilla, BlockStateModel fusion) {
+            super(vanilla);
+            this.fusion = fusion;
+        }
 
         private BlockStateModel selected(BlockAndTintGetter level, BlockPos pos) {
             return Boolean.TRUE.equals(level.getBlockEntityRenderData(pos)) ? fusion : wrapped;
         }
-        @Override public void emitQuads(QuadEmitter emitter, BlockAndTintGetter level, BlockPos pos, BlockState state,
+        @Override
+        public void emitQuads(QuadEmitter emitter, BlockAndTintGetter level, BlockPos pos, BlockState state,
                                         RandomSource random, Predicate<Direction> cullTest) {
             selected(level, pos).emitQuads(emitter, level, pos, state, random, cullTest);
         }
-        @Override public Object createGeometryKey(BlockAndTintGetter level, BlockPos pos, BlockState state, RandomSource random) {
+        @Override
+        public Object createGeometryKey(BlockAndTintGetter level, BlockPos pos, BlockState state, RandomSource random) {
             return selected(level, pos).createGeometryKey(level, pos, state, random);
         }
-        @Override public Material.Baked particleMaterial(BlockAndTintGetter level, BlockPos pos, BlockState state) {
+        @Override
+        public Material.Baked particleMaterial(BlockAndTintGetter level, BlockPos pos, BlockState state) {
             return selected(level, pos).particleMaterial(level, pos, state);
         }
-        @Override public int materialFlags() { return wrapped.materialFlags() | fusion.materialFlags(); }
-        @Override public boolean hasMaterialFlag(int flag) { return (materialFlags() & flag) != 0; }
-        @Override public int materialFlags(BlockAndTintGetter level, BlockPos pos, BlockState state, RandomSource random) {
+        @Override
+        public int materialFlags() { return wrapped.materialFlags() | fusion.materialFlags(); }
+        @Override
+        public boolean hasMaterialFlag(int flag) { return (materialFlags() & flag) != 0; }
+        @Override
+        public int materialFlags(BlockAndTintGetter level, BlockPos pos, BlockState state, RandomSource random) {
             return selected(level, pos).materialFlags(level, pos, state, random);
         }
-        @Override public boolean hasMaterialFlag(BlockAndTintGetter level, BlockPos pos, BlockState state, RandomSource random, int flag) {
+        @Override
+        public boolean hasMaterialFlag(BlockAndTintGetter level, BlockPos pos, BlockState state, RandomSource random, int flag) {
             return (materialFlags(level, pos, state, random) & flag) != 0;
         }
     }

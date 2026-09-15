@@ -1,6 +1,7 @@
 package dev.rocks.infinitecraft.mixin;
 
-import dev.rocks.infinitecraft.DiscoveryBook;
+import dev.rocks.infinitecraft.discovery.DiscoveryBook;
+import dev.rocks.infinitecraft.fusion.FusionDrops;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -38,6 +39,6 @@ abstract class BoundBookPlayerMixin {
     @Inject(method = "drop(Lnet/minecraft/world/item/ItemStack;ZZ)Lnet/minecraft/world/entity/item/ItemEntity;",
             at = @At("RETURN"))
     private void rememberSingleDrop(ItemStack stack, boolean random, boolean trace, CallbackInfoReturnable<ItemEntity> callback) {
-        dev.rocks.infinitecraft.FusionDrops.mark(callback.getReturnValue(), random, trace);
+        FusionDrops.mark(callback.getReturnValue(), random, trace);
     }
 }

@@ -1,6 +1,6 @@
 package dev.rocks.infinitecraft.mixin;
 
-import dev.rocks.infinitecraft.DiscoveryBook;
+import dev.rocks.infinitecraft.discovery.DiscoveryBook;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;

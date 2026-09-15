@@ -1,6 +1,5 @@
 package dev.rocks.infinitecraft.traits;
 
-import java.util.Objects;
 import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.component.DataComponents;
@@ -10,9 +9,11 @@ import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.ItemAttributeModifiers;
+
+import java.util.Objects;
 
 /** Minecraft-specific operations shared by trait implementations. */
 public final class TraitComponents {

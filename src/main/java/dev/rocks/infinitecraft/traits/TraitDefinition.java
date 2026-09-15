@@ -1,8 +1,10 @@
 package dev.rocks.infinitecraft.traits;
 
-import java.util.Set;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.world.item.ItemStack;
+
+import java.util.List;
+import java.util.Set;
 
 /** One trait's metadata, compatibility rules and native component changes. */
 public interface TraitDefinition {
@@ -14,11 +16,17 @@ public interface TraitDefinition {
 
     String id();
 
-    default java.util.List<String> activationModes() { return java.util.List.of("auto"); }
+    default List<String> activationModes() {
+        return List.of("auto");
+    }
 
-    default boolean prepareActivation(ItemStack output, String activation) { return true; }
+    default boolean prepareActivation(ItemStack output, String activation) {
+        return true;
+    }
 
-    default void apply(ItemStack output, double value, String activation) { apply(output, value); }
+    default void apply(ItemStack output, double value, String activation) {
+        apply(output, value);
+    }
 
     default StrengthRange range() {
         return null;

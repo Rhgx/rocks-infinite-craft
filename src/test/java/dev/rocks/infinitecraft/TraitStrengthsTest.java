@@ -1,8 +1,12 @@
 package dev.rocks.infinitecraft;
+
 import dev.rocks.infinitecraft.core.*;
-import java.util.*;
 import org.junit.jupiter.api.Test;
+
+import java.util.*;
+
 import static org.junit.jupiter.api.Assertions.*;
+
 class TraitStrengthsTest {
     @Test void rejectsInvalidAndUnselectedStrengths() {
         for (double value : new double[] {-0.1,1.1,Double.NaN,Double.POSITIVE_INFINITY})

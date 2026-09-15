@@ -1,15 +1,17 @@
 package dev.rocks.infinitecraft.traits;
 
+import dev.rocks.infinitecraft.core.ValidationPatterns;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.item.ItemStack;
+
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import net.minecraft.core.component.DataComponentType;
-import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.effect.MobEffects;
 
 import static dev.rocks.infinitecraft.traits.AttributeTrait.Mode.ADD;
 import static dev.rocks.infinitecraft.traits.AttributeTrait.Mode.DECREASE_FRACTION;
@@ -74,7 +76,7 @@ public final class TraitRegistry {
     private static Map<String, TraitDefinition> index(List<TraitDefinition> definitions) {
         Map<String, TraitDefinition> indexed = new LinkedHashMap<>();
         for (var trait : definitions) {
-            if (!trait.id().matches("[a-z0-9_.:-]{1,64}") || indexed.putIfAbsent(trait.id(), trait) != null) {
+            if (!ValidationPatterns.isTraitId(trait.id()) || indexed.putIfAbsent(trait.id(), trait) != null) {
                 throw new IllegalArgumentException("Invalid or duplicate trait ID: " + trait.id());
             }
         }

@@ -4,9 +4,12 @@ import dev.rocks.infinitecraft.core.CatalogEntry;
 import dev.rocks.infinitecraft.core.GenerationRequest;
 import dev.rocks.infinitecraft.core.PairKey;
 import dev.rocks.infinitecraft.core.RecipeResult;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -15,8 +18,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class RecipeEngineTest {

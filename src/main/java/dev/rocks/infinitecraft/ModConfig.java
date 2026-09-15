@@ -3,11 +3,12 @@ package dev.rocks.infinitecraft;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import dev.rocks.infinitecraft.provider.ProviderConfig;
+
 import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.util.Set;
 
 public final class ModConfig {
@@ -53,12 +54,12 @@ public final class ModConfig {
     public Set<String> excludedIds = Set.of();
     public Set<String> excludedNamespaces = Set.of();
 
-    boolean sameCatalog(ModConfig other) {
+    public boolean sameCatalog(ModConfig other) {
         return allowModdedItems == other.allowModdedItems && excludedIds.equals(other.excludedIds)
                 && excludedNamespaces.equals(other.excludedNamespaces);
     }
 
-    boolean sameGeneration(ModConfig other) {
+    public boolean sameGeneration(ModConfig other) {
         return provider.equals(other.provider) && enabled == other.enabled && generationEnabled == other.generationEnabled
                 && allowItemData == other.allowItemData && generatedTraits == other.generatedTraits
                 && combineSpecialItems == other.combineSpecialItems && specialResultChance == other.specialResultChance
@@ -115,8 +116,9 @@ public final class ModConfig {
         Path temporary = Files.createTempFile(absolute.getParent(), "infinitecraft-", ".tmp");
         try {
             Files.writeString(temporary, GSON.toJson(this));
-            try { Files.move(temporary, absolute, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING); }
-            catch (AtomicMoveNotSupportedException error) {
+            try {
+                Files.move(temporary, absolute, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException error) {
                 Files.move(temporary, absolute, StandardCopyOption.REPLACE_EXISTING);
             }
         } finally { Files.deleteIfExists(temporary); }

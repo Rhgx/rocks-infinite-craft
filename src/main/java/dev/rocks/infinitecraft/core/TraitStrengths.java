@@ -2,6 +2,7 @@ package dev.rocks.infinitecraft.core;
 
 import dev.rocks.infinitecraft.traits.StrengthRange;
 import dev.rocks.infinitecraft.traits.TraitRegistry;
+
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;

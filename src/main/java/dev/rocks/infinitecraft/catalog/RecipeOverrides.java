@@ -6,6 +6,7 @@ import com.google.gson.JsonParser;
 import dev.rocks.infinitecraft.core.CatalogEntry;
 import dev.rocks.infinitecraft.core.PairKey;
 import dev.rocks.infinitecraft.core.RecipeResult;
+import dev.rocks.infinitecraft.core.ValidationPatterns;
 import net.minecraft.server.MinecraftServer;
 
 import java.io.IOException;
@@ -73,7 +74,7 @@ public final class RecipeOverrides {
     private static String identifier(JsonObject object, String key) {
         JsonElement value = object.get(key);
         if (value == null || !value.isJsonPrimitive() || !value.getAsJsonPrimitive().isString()
-                || !value.getAsString().matches("[a-z0-9_.-]+:[a-z0-9/._-]+")) {
+                || !ValidationPatterns.isResourceId(value.getAsString())) {
             throw new IllegalArgumentException(key + " must be a full namespaced item ID");
         }
         return value.getAsString();

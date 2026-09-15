@@ -4,12 +4,14 @@ import com.google.gson.*;
 import com.sun.net.httpserver.HttpServer;
 import dev.rocks.infinitecraft.core.*;
 import org.junit.jupiter.api.Test;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class HttpRecipeGeneratorTest {
@@ -60,7 +62,7 @@ class HttpRecipeGeneratorTest {
         String response = "{\"itemId\":\"minecraft:potion\",\"potion\":\"minecraft:swiftness\"}";
         assertEquals("minecraft:swiftness", candidates(response, request).getFirst().potion());
         assertThrows(InvalidRecipeResponseException.class, () -> candidates(response.replace("swiftness", "missing"), request));
-        assertTrue(HttpRecipeGenerator.prompt(request).contains("Names alone do not give potion effects"));
+        assertTrue(RecipePrompt.build(request).contains("Names alone do not give potion effects"));
         var schema = CodexRecipeGenerator.schema(request).getAsJsonObject("properties").getAsJsonObject("results").getAsJsonObject("items");
         assertTrue(schema.getAsJsonArray("required").contains(new JsonPrimitive("potion")));
         assertEquals(2, schema.getAsJsonObject("properties").getAsJsonObject("potion").getAsJsonArray("enum").size());
@@ -196,7 +198,7 @@ class HttpRecipeGeneratorTest {
         assertEquals(5, candidates("{\"results\":[" + String.join(",", java.util.Collections.nCopies(6, valid)) + "]}", request).size());
         assertEquals(List.of(new RecipeResult("minecraft:cobblestone", 1)), candidates(valid, REQUEST),
                 "Plain requests must strip unsolicited names and traits without rejecting a usable item");
-        assertTrue(HttpRecipeGenerator.prompt(REQUEST).contains("Return ordinary items"));
+        assertTrue(RecipePrompt.build(REQUEST).contains("Return ordinary items"));
     }
 
     @Test void invalidMetadataAndMalformedPayloadsHaveTypedFailure() throws Exception {
@@ -217,7 +219,7 @@ class HttpRecipeGeneratorTest {
     }
 
     private static List<RecipeResult> candidates(String payload, GenerationRequest request) throws Exception {
-        return HttpRecipeGenerator.parseCandidates(payload, request);
+        return RecipeResponseParser.parseCandidates(payload, request);
     }
 
     private static IOException callFailure(String reply, int status, long delay) throws Exception {

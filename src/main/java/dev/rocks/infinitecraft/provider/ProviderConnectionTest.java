@@ -2,6 +2,7 @@ package dev.rocks.infinitecraft.provider;
 
 import dev.rocks.infinitecraft.core.CatalogEntry;
 import dev.rocks.infinitecraft.core.GenerationRequest;
+
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;

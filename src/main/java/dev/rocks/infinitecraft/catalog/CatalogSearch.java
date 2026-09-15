@@ -1,12 +1,24 @@
 package dev.rocks.infinitecraft.catalog;
 
 import dev.rocks.infinitecraft.core.CatalogEntry;
-import java.util.*;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /** Immutable per-snapshot search data; no game classes are retained. */
 public final class CatalogSearch {
+    // Removes a leading Minecraft namespace such as "minecraft:" before tokenizing an ID.
     private static final Pattern NAMESPACE = Pattern.compile("[a-z0-9_.-]+:");
+    // Splits searchable text anywhere that is not a lowercase letter or digit.
     private static final Pattern WORD_SEPARATOR = Pattern.compile("[^a-z0-9]+");
     private CatalogSearch() {}
     private record Candidate(CatalogEntry entry, Set<String> names, Set<String> tags, Set<String> all) {}

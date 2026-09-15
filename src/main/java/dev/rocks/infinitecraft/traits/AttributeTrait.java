@@ -1,27 +1,27 @@
 package dev.rocks.infinitecraft.traits;
 
-import java.util.Set;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Locale;
+import net.minecraft.core.Holder;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.EquipmentSlotGroup;
-import net.minecraft.world.item.equipment.Equippable;
-import net.minecraft.world.item.component.ItemAttributeModifiers;
-import net.minecraft.world.item.component.Consumable;
-import net.minecraft.world.item.consume_effects.ConsumeEffect;
-import net.minecraft.world.item.consume_effects.ApplyStatusEffectsConsumeEffect;
-import net.minecraft.resources.Identifier;
-
-import java.util.function.Supplier;
-import net.minecraft.core.Holder;
-import net.minecraft.core.component.DataComponentType;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.Consumable;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
+import net.minecraft.world.item.consume_effects.ApplyStatusEffectsConsumeEffect;
+import net.minecraft.world.item.consume_effects.ConsumeEffect;
+import net.minecraft.world.item.equipment.Equippable;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.function.Supplier;
 
 /** Attribute suppliers defer registry access until an item is actually being generated. */
 public record AttributeTrait(
@@ -35,13 +35,15 @@ public record AttributeTrait(
         this(id, range, attribute, mode, null);
     }
 
-    @Override public List<String> activationModes() {
+    @Override
+    public List<String> activationModes() {
         var modes = new ArrayList<>(List.of("auto", "mainhand", "offhand", "head", "chest", "legs", "feet"));
         if (consumedEffect != null) modes.addAll(List.of("consumed", "consumed_brief", "consumed_long", "consumed_intense"));
         return List.copyOf(modes);
     }
 
-    @Override public boolean prepareActivation(ItemStack output, String activation) {
+    @Override
+    public boolean prepareActivation(ItemStack output, String activation) {
         if (!Set.of("head", "chest", "legs", "feet").contains(activation)) return true;
         var slot = EquipmentSlot.valueOf(activation.toUpperCase(Locale.ROOT));
         var equipment = output.get(DataComponents.EQUIPPABLE);
@@ -67,7 +69,8 @@ public record AttributeTrait(
         apply(output, value, "auto");
     }
 
-    @Override public void apply(ItemStack output, double value, String activation) {
+    @Override
+    public void apply(ItemStack output, double value, String activation) {
         if (activation.startsWith("consumed")) {
             if (consumedEffect == null) throw new IllegalArgumentException("No consumed form for this trait");
             var modifiers = output.getOrDefault(DataComponents.ATTRIBUTE_MODIFIERS, ItemAttributeModifiers.EMPTY);

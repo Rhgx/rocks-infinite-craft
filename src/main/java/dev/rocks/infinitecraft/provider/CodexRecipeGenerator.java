@@ -3,6 +3,7 @@ package dev.rocks.infinitecraft.provider;
 import dev.rocks.infinitecraft.core.GenerationRequest;
 import dev.rocks.infinitecraft.core.RecipeGenerator;
 import dev.rocks.infinitecraft.core.RecipeResult;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -30,11 +31,13 @@ public final class CodexRecipeGenerator implements RecipeGenerator {
         this.command = List.copyOf(command);
     }
 
-    @Override public RecipeResult generate(GenerationRequest request) throws Exception { return generateCandidates(request).getFirst(); }
+    @Override
+    public RecipeResult generate(GenerationRequest request) throws Exception { return generateCandidates(request).getFirst(); }
 
-    @Override public List<RecipeResult> generateCandidates(GenerationRequest request) throws Exception {
+    @Override
+    public List<RecipeResult> generateCandidates(GenerationRequest request) throws Exception {
         byte[] prompt = ("Answer only from the supplied data. Do not use tools, read files, browse, or modify anything. "
-                + HttpRecipeGenerator.prompt(request, true)).getBytes(StandardCharsets.UTF_8);
+                + RecipePrompt.build(request, true)).getBytes(StandardCharsets.UTF_8);
         if (prompt.length > MAX_BYTES) throw new IOException("Codex request exceeds size limit");
         List<String> executable = command.isEmpty() ? List.of(findExecutable().toString()) : command;
         Path scratch = Files.createTempDirectory("infinitecraft-codex-");
@@ -47,15 +50,23 @@ public final class CodexRecipeGenerator implements RecipeGenerator {
             // Prevent inherited desktop session routing from turning a CLI request into app work.
             builder.environment().remove("CODEX_THREAD_ID");
             builder.environment().remove("CODEX_TURN_ID");
-            try { process = builder.start(); }
-            catch (IOException error) { throw new IOException("Codex CLI could not start; check its executable path"); }
+            try {
+                process = builder.start();
+            } catch (IOException error) {
+                throw new IOException("Codex CLI could not start; check its executable path");
+            }
             Process child = process;
             var stdout = read(child.getInputStream(), child);
             var stderr = read(child.getErrorStream(), child);
             var input = new CompletableFuture<Void>();
             Thread.ofVirtual().name("infinitecraft-codex-input").start(() -> {
-                try (var stream = child.getOutputStream()) { stream.write(prompt); input.complete(null); }
-                catch (IOException error) { input.completeExceptionally(new IOException("Codex input failed")); }
+                try (var stream = child.getOutputStream()) {
+                    stream.write(prompt);
+                    input.complete(null);
+                }
+                catch (IOException error) {
+                    input.completeExceptionally(new IOException("Codex input failed"));
+                }
             });
             long deadline = System.nanoTime() + Duration.ofSeconds(config.timeoutSeconds()).toNanos();
             try {
@@ -111,7 +122,7 @@ public final class CodexRecipeGenerator implements RecipeGenerator {
     }
 
     static com.google.gson.JsonObject schema(GenerationRequest request) {
-        var schema = HttpRecipeGenerator.ollamaSchema(request).getAsJsonObject();
+        var schema = RecipeSchema.build(request).getAsJsonObject();
         if (request.supportedTraits().isEmpty()) return schema;
         var recipe = schema.getAsJsonObject("properties").getAsJsonObject("results").getAsJsonObject("items");
         var properties = recipe.getAsJsonObject("properties");
@@ -143,21 +154,24 @@ public final class CodexRecipeGenerator implements RecipeGenerator {
 
     static List<RecipeResult> parseCandidates(String text, GenerationRequest request) throws dev.rocks.infinitecraft.core.InvalidRecipeResponseException {
         try {
-            var payload = HttpRecipeGenerator.parseObject(text);
+            var payload = RecipeResponseParser.parseObject(text);
             if (payload.has("results") && payload.get("results").isJsonArray()) {
                 var results = payload.getAsJsonArray("results");
                 for (int i = 0; i < Math.min(5, results.size()); i++) {
                     var item = results.get(i);
                     if (!item.isJsonObject()) continue;
-                    try { normalizeControls(item.getAsJsonObject()); }
-                    catch (IllegalArgumentException | IllegalStateException error) {
+                    try {
+                        normalizeControls(item.getAsJsonObject());
+                    } catch (IllegalArgumentException | IllegalStateException error) {
                         // Keep its position so a malformed entry cannot admit a sixth proposal.
                         results.set(i, com.google.gson.JsonNull.INSTANCE);
                     }
                 }
             } else normalizeControls(payload);
-            return HttpRecipeGenerator.parseCandidates(payload.toString(), request);
-        } catch (IOException | RuntimeException error) { throw new dev.rocks.infinitecraft.core.InvalidRecipeResponseException(); }
+            return RecipeResponseParser.parseCandidates(payload.toString(), request);
+        } catch (IOException | RuntimeException error) {
+            throw new dev.rocks.infinitecraft.core.InvalidRecipeResponseException();
+        }
     }
 
     private static void normalizeControls(com.google.gson.JsonObject recipe) {
@@ -192,6 +206,7 @@ public final class CodexRecipeGenerator implements RecipeGenerator {
         }
         boolean windows = System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("win");
         String searchPath = System.getenv("PATH");
+        // PATH uses the platform separator, semicolon on Windows and colon on Unix-like systems.
         for (String directory : (searchPath == null ? "" : searchPath).split(java.io.File.pathSeparator)) {
             if (directory.isBlank()) continue;
             Path base = Path.of(directory.replace("\"", ""));
@@ -219,7 +234,9 @@ public final class CodexRecipeGenerator implements RecipeGenerator {
                     throw new IOException("Codex output limit exceeded");
                 }
                 result.complete(bytes);
-            } catch (IOException error) { result.completeExceptionally(new IOException("Codex process output failed")); }
+            } catch (IOException error) {
+                result.completeExceptionally(new IOException("Codex process output failed"));
+            }
         });
         return result;
     }
@@ -228,8 +245,11 @@ public final class CodexRecipeGenerator implements RecipeGenerator {
         process.descendants().forEach(child -> { if (child.isAlive()) child.destroyForcibly(); });
         if (process.isAlive()) process.destroyForcibly();
         boolean interrupted = Thread.interrupted();
-        try { process.waitFor(2, TimeUnit.SECONDS); }
-        catch (InterruptedException error) { interrupted = true; }
+        try {
+            process.waitFor(2, TimeUnit.SECONDS);
+        } catch (InterruptedException error) {
+            interrupted = true;
+        }
         finally { if (interrupted) Thread.currentThread().interrupt(); }
     }
 }

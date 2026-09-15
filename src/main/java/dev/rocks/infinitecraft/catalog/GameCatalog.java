@@ -2,16 +2,16 @@ package dev.rocks.infinitecraft.catalog;
 
 import com.google.gson.GsonBuilder;
 import dev.rocks.infinitecraft.core.CatalogEntry;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.item.GameMasterBlockItem;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.world.flag.FeatureFlagSet;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.resources.Identifier;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.flag.FeatureFlagSet;
+import net.minecraft.world.item.GameMasterBlockItem;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.Block;
 
 import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;

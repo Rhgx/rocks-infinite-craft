@@ -1,12 +1,14 @@
 package dev.rocks.infinitecraft.client;
 
-import dev.rocks.infinitecraft.SpecialItemsTab;
 import dev.rocks.infinitecraft.client.mixin.CreativeModeInventoryScreenAccess;
+import dev.rocks.infinitecraft.discovery.SpecialItemsTab;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.CreativeModeTab;
+
+import java.util.List;
 
 final class SpecialItemsTabClient {
     private SpecialItemsTabClient() {}
@@ -26,6 +28,6 @@ final class SpecialItemsTabClient {
                         .infinitecraft$refreshCurrentTabContents(tab.getDisplayItems());
             }
         });
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> SpecialItemsTab.replace(java.util.List.of()));
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> SpecialItemsTab.replace(List.of()));
     }
 }

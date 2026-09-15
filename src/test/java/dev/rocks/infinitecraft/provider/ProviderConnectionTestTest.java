@@ -1,11 +1,13 @@
 package dev.rocks.infinitecraft.provider;
 
 import com.sun.net.httpserver.HttpServer;
+import org.junit.jupiter.api.Test;
+
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import org.junit.jupiter.api.Test;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class ProviderConnectionTestTest {

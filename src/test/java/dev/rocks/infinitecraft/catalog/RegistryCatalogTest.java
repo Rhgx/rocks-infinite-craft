@@ -3,15 +3,15 @@ package dev.rocks.infinitecraft.catalog;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.Lifecycle;
 import dev.rocks.infinitecraft.core.CatalogEntry;
-import net.minecraft.server.Bootstrap;
 import net.minecraft.SharedConstants;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.Registry;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.Bootstrap;
 import net.minecraft.tags.TagKey;
 import net.minecraft.tags.TagLoader;
 import net.minecraft.world.flag.FeatureFlags;
@@ -27,8 +27,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Set;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 

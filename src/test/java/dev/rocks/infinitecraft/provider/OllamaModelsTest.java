@@ -1,12 +1,14 @@
 package dev.rocks.infinitecraft.provider;
 
 import com.sun.net.httpserver.HttpServer;
+import org.junit.jupiter.api.Test;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
-import org.junit.jupiter.api.Test;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class OllamaModelsTest {

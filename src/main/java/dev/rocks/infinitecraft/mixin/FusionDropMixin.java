@@ -1,6 +1,6 @@
 package dev.rocks.infinitecraft.mixin;
 
-import dev.rocks.infinitecraft.FusionDrops;
+import dev.rocks.infinitecraft.fusion.FusionDrops;
 import net.minecraft.world.entity.item.ItemEntity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;

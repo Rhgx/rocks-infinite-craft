@@ -2,21 +2,29 @@ package dev.rocks.infinitecraft.engine;
 
 import dev.rocks.infinitecraft.core.CatalogEntry;
 import dev.rocks.infinitecraft.core.GenerationRequest;
+import dev.rocks.infinitecraft.core.InvalidRecipeResponseException;
 import dev.rocks.infinitecraft.core.PairKey;
 import dev.rocks.infinitecraft.core.RecipeGenerator;
+import dev.rocks.infinitecraft.core.RecipeQuality;
 import dev.rocks.infinitecraft.core.RecipeResult;
-import dev.rocks.infinitecraft.core.InvalidRecipeResponseException;
-import java.util.function.Predicate;
+
+import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /** Resolves recipes off the game thread. The caller still validates live game state. */
@@ -25,13 +33,14 @@ public final class RecipeEngine implements AutoCloseable {
     private final RecipeGenerator generator;
     private final int generationAttempts;
     private final ThreadPoolExecutor worker;
-    private final Map<String, CompletableFuture<RecipeResult>> pending = new java.util.LinkedHashMap<>();
+    private final Map<String, CompletableFuture<RecipeResult>> pending = new LinkedHashMap<>();
     private final Map<String, Future<?>> tasks = new HashMap<>();
     private final Map<String, CompletableFuture<Void>> edits = new HashMap<>();
-    private final Set<String> activeKeys = new java.util.HashSet<>();
+    private final Set<String> activeKeys = new HashSet<>();
     private volatile boolean closed;
 
-    public record QueuePosition(int position, int total) {}
+    public record QueuePosition(int position, int total) {
+    }
 
     /** Positions count waiting recipes only, excluding the active request and shared callers. */
     public synchronized QueuePosition queuePosition(String key) {
@@ -73,7 +82,9 @@ public final class RecipeEngine implements AutoCloseable {
         return resolve(request, overrides, eligible(request));
     }
 
-    public synchronized java.util.Optional<RecipeResult> knownVariant(String key) { return store.get(key); }
+    public synchronized Optional<RecipeResult> knownVariant(String key) {
+        return store.get(key);
+    }
 
     public synchronized CompletableFuture<RecipeResult> resolveVariant(GenerationRequest request,
             Set<String> allowedOutputs, Predicate<RecipeResult> validator, String key) {
@@ -88,8 +99,12 @@ public final class RecipeEngine implements AutoCloseable {
         if (existing != null) return existing.thenApply(result -> validate(result, allowed));
         var future = new CompletableFuture<RecipeResult>();
         pending.put(key, future);
-        try { tasks.put(key, worker.submit(() -> generate(key, request, allowed, validator, future))); }
-        catch (RejectedExecutionException error) { pending.remove(key); future.completeExceptionally(error); }
+        try {
+            tasks.put(key, worker.submit(() -> generate(key, request, allowed, validator, future)));
+        } catch (RejectedExecutionException error) {
+            pending.remove(key);
+            future.completeExceptionally(error);
+        }
         return future.copy();
     }
 
@@ -128,7 +143,9 @@ public final class RecipeEngine implements AutoCloseable {
 
     private void generate(String key, GenerationRequest request, Set<String> allowed, Predicate<RecipeResult> validator,
             CompletableFuture<RecipeResult> future) {
-        synchronized (this) { activeKeys.add(key); }
+        synchronized (this) {
+            activeKeys.add(key);
+        }
         try {
             if (future.isDone() || closed) return;
             RecipeResult result = generateCandidate(request, allowed, validator, key, future);
@@ -168,21 +185,28 @@ public final class RecipeEngine implements AutoCloseable {
     private RecipeResult generateCandidate(GenerationRequest request, Set<String> allowed, Predicate<RecipeResult> validator,
             String failureKey, CompletableFuture<RecipeResult> future) throws Exception {
         Set<String> shortlist = eligible(request);
-        if (shortlist.isEmpty()) throw new java.io.IOException("No eligible crafting candidates available");
+        if (shortlist.isEmpty()) throw new IOException("No eligible crafting candidates available");
         for (int attempt = 0; attempt < generationAttempts; attempt++) {
-            if (closed || future.isDone() || Thread.currentThread().isInterrupted()) throw new java.util.concurrent.CancellationException();
-            java.util.List<RecipeResult> candidates;
-            try { candidates = generator.generateCandidates(request); }
-            catch (InvalidRecipeResponseException invalid) { continue; }
+            if (closed || future.isDone() || Thread.currentThread().isInterrupted()) throw new CancellationException();
+            List<RecipeResult> candidates;
+            try {
+                candidates = generator.generateCandidates(request);
+            } catch (InvalidRecipeResponseException invalid) {
+                continue;
+            }
             if (candidates == null) continue;
             for (RecipeResult candidate : candidates.stream().limit(5).toList()) {
-                try { validate(candidate, shortlist); validate(candidate, allowed); }
-                catch (IllegalArgumentException invalid) { continue; }
-                candidate = dev.rocks.infinitecraft.core.RecipeQuality.apply(candidate, request);
+                try {
+                    validate(candidate, shortlist);
+                    validate(candidate, allowed);
+                } catch (IllegalArgumentException invalid) {
+                    continue;
+                }
+                candidate = RecipeQuality.apply(candidate, request);
                 if (candidate.count() <= request.maxOutputCount() && validator.test(candidate)) return candidate;
             }
         }
-        if (closed || future.isDone() || Thread.currentThread().isInterrupted()) throw new java.util.concurrent.CancellationException();
+        if (closed || future.isDone() || Thread.currentThread().isInterrupted()) throw new CancellationException();
         if (failureKey != null) store.blockIf(failureKey, () -> !closed && !future.isDone());
         throw new BlockedRecipeException();
     }
@@ -196,18 +220,21 @@ public final class RecipeEngine implements AutoCloseable {
         if (edits.containsKey(key)) return key + ": update pending";
         RecipeResult result = overrides.get(key);
         String source = "data-pack override";
-        if (result == null) { result = store.get(key).orElse(null); source = "saved discovery"; }
+        if (result == null) {
+            result = store.get(key).orElse(null);
+            source = "saved discovery";
+        }
         if (result == null) return key + ": " + (store.isBlocked(key) ? "blocked after invalid generation" : pending.containsKey(key) ? "generation pending" : "no recipe saved");
         return key + " -> " + result.count() + " " + result.itemId() + " (" + source + ")"
                 + (allowed.contains(result.itemId()) ? "" : " [output unavailable or excluded]");
     }
 
-    public synchronized java.util.Optional<RecipeResult> knownRecipe(String first, String second, Map<String, RecipeResult> overrides) {
+    public synchronized Optional<RecipeResult> knownRecipe(String first, String second, Map<String, RecipeResult> overrides) {
         if (closed) throw new IllegalStateException("Recipe engine is closed");
         String key = PairKey.of(first, second);
         if (edits.containsKey(key)) throw new IllegalStateException("Recipe is being updated");
         RecipeResult override = overrides.get(key);
-        return override == null ? store.get(key) : java.util.Optional.of(override);
+        return override == null ? store.get(key) : Optional.of(override);
     }
 
     public CompletableFuture<Void> setRecipe(String first, String second, RecipeResult result,
@@ -222,7 +249,10 @@ public final class RecipeEngine implements AutoCloseable {
 
     private synchronized CompletableFuture<Void> edit(String key, RecipeResult result, Map<String, RecipeResult> overrides) {
         if (closed) return CompletableFuture.failedFuture(new IllegalStateException("Recipe engine is closed"));
-        if (overrides.containsKey(key)) return CompletableFuture.failedFuture(new IllegalArgumentException("A data-pack override controls this pair; edit or remove that override first"));
+        if (overrides.containsKey(key)) {
+            return CompletableFuture.failedFuture(new IllegalArgumentException(
+                    "A data-pack override controls this pair; edit or remove that override first"));
+        }
         if (edits.containsKey(key)) return CompletableFuture.failedFuture(new IllegalStateException("Recipe update already pending"));
         CompletableFuture<Void> future = new CompletableFuture<>();
         try {
@@ -235,7 +265,10 @@ public final class RecipeEngine implements AutoCloseable {
                         future.complete(null);
                     }
                 } catch (Exception error) {
-                    synchronized (this) { edits.remove(key); future.completeExceptionally(error); }
+                    synchronized (this) {
+                        edits.remove(key);
+                        future.completeExceptionally(error);
+                    }
                 }
             });
             edits.put(key, future);
@@ -244,7 +277,9 @@ public final class RecipeEngine implements AutoCloseable {
                 entry.getValue().cancel(false);
                 return true;
             });
-        } catch (RejectedExecutionException error) { future.completeExceptionally(error); }
+        } catch (RejectedExecutionException error) {
+            future.completeExceptionally(error);
+        }
         return future.copy();
     }
 

@@ -1,6 +1,7 @@
 package dev.rocks.infinitecraft.provider;
 
 import com.google.gson.JsonParser;
+
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -20,8 +21,11 @@ public final class OllamaModels {
 
     public static List<String> fetch(String baseUrl) throws IOException, InterruptedException {
         ProviderConfig config;
-        try { config = new ProviderConfig("ollama", baseUrl, "discovery", "", 5); }
-        catch (IllegalArgumentException error) { throw new IOException("Invalid Ollama URL"); }
+        try {
+            config = new ProviderConfig("ollama", baseUrl, "discovery", "", 5);
+        } catch (IllegalArgumentException error) {
+            throw new IOException("Invalid Ollama URL");
+        }
         HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5))
                 .followRedirects(HttpClient.Redirect.NEVER).build();
         var request = HttpRequest.newBuilder(URI.create(config.baseUrl() + "/api/tags"))

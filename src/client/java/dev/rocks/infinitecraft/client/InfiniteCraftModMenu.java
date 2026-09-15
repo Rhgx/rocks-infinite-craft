@@ -2,13 +2,15 @@ package dev.rocks.infinitecraft.client;
 
 import com.terraformersmc.modmenu.api.ConfigScreenFactory;
 import com.terraformersmc.modmenu.api.ModMenuApi;
+import dev.rocks.infinitecraft.client.config.InfiniteCraftConfigScreen;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.AlertScreen;
 import net.minecraft.network.chat.Component;
 
 public final class InfiniteCraftModMenu implements ModMenuApi {
-    @Override public ConfigScreenFactory<?> getModConfigScreenFactory() {
+    @Override
+    public ConfigScreenFactory<?> getModConfigScreenFactory() {
         return parent -> {
             if (!FabricLoader.getInstance().isModLoaded("cloth-config"))
                 return new AlertScreen(() -> Minecraft.getInstance().setScreenAndShow(parent),

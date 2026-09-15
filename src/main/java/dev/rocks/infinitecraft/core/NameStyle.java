@@ -9,7 +9,7 @@ public record NameStyle(String color, boolean bold, boolean italic, boolean unde
 
     public NameStyle {
         color = color == null ? "" : color;
-        if (!color.isEmpty() && !color.matches("#[0-9a-fA-F]{6}"))
+        if (!color.isEmpty() && !ValidationPatterns.isOptionalHexColor(color))
             throw new IllegalArgumentException("Name color must be #RRGGBB");
     }
 }

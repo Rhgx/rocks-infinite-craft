@@ -1,14 +1,15 @@
 package dev.rocks.infinitecraft.traits;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.Consumable;
 import net.minecraft.world.item.consume_effects.ConsumeEffect;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 
 /** Shared food composition preserves existing nutrition and unrelated consume effects. */
 public abstract class FoodTrait implements TraitDefinition {

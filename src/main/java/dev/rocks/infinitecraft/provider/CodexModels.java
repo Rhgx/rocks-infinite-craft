@@ -1,6 +1,8 @@
 package dev.rocks.infinitecraft.provider;
 
 import com.google.gson.JsonObject;
+import dev.rocks.infinitecraft.core.ValidationPatterns;
+
 import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -51,7 +53,7 @@ public final class CodexModels {
                             line.write(next);
                         }
                         if (--remaining <= 0 || next == -1) throw new IOException();
-                        response = HttpRecipeGenerator.parseObject(line.toString(StandardCharsets.UTF_8));
+                        response = RecipeResponseParser.parseObject(line.toString(StandardCharsets.UTF_8));
                         if (response.has("id") && response.get("id").getAsString().equals(Integer.toString(id))) break;
                     }
                     if (response.has("error") || !response.has("result")) throw new IOException();
@@ -66,7 +68,7 @@ public final class CodexModels {
                             var model = entry.getAsJsonObject();
                             if (model.has("hidden") && model.get("hidden").getAsBoolean()) continue;
                             String name = model.get("model").getAsString();
-                            if (!name.matches("[A-Za-z0-9_./:@-]{1,200}")) continue;
+                            if (!ValidationPatterns.isModelId(name)) continue;
                             var levels = new ArrayList<String>();
                             if (model.has("supportedReasoningEfforts")) {
                                 for (var effort : model.getAsJsonArray("supportedReasoningEfforts")) {

@@ -1,10 +1,11 @@
 package dev.rocks.infinitecraft.traits;
 
-import java.util.Set;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+
+import java.util.Set;
 
 public final class BlockingTrait implements TraitDefinition {
     @Override

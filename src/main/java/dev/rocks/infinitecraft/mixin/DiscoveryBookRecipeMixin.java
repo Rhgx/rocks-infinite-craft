@@ -1,7 +1,7 @@
 package dev.rocks.infinitecraft.mixin;
 
-import dev.rocks.infinitecraft.DiscoveryBook;
 import dev.rocks.infinitecraft.InfiniteCraftMod;
+import dev.rocks.infinitecraft.discovery.DiscoveryBook;
 import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.CraftingInput;

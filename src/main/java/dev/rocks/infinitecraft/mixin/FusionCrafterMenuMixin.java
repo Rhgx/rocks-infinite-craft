@@ -42,7 +42,8 @@ abstract class FusionCrafterMenuMixin extends AbstractContainerMenu {
         ci.cancel();
     }
 
-    @Override public void broadcastChanges() {
+    @Override
+    public void broadcastChanges() {
         if (fusionMenu()) updateFusionPreview();
         super.broadcastChanges();
     }

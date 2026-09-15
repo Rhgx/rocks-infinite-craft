@@ -6,16 +6,19 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import dev.rocks.infinitecraft.core.RecipeResult;
+import dev.rocks.infinitecraft.core.ValidationPatterns;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.HashSet;
+import java.util.function.BooleanSupplier;
 
 /** World-local discoveries. A rejected file is never replaced with an empty store. */
 public final class RecipeStore {
@@ -64,7 +67,9 @@ public final class RecipeStore {
         return Optional.ofNullable(recipes.get(key));
     }
 
-    public boolean isBlocked(String key) { return blocked.contains(key); }
+    public boolean isBlocked(String key) {
+        return blocked.contains(key);
+    }
 
     public synchronized void put(String key, RecipeResult result) throws IOException {
         put(key, result, true);
@@ -91,7 +96,7 @@ public final class RecipeStore {
         write(next, nextBlocked);
     }
 
-    synchronized boolean blockIf(String key, java.util.function.BooleanSupplier active) throws IOException {
+    synchronized boolean blockIf(String key, BooleanSupplier active) throws IOException {
         if (!active.getAsBoolean()) return false;
         Set<String> nextBlocked = new HashSet<>(blocked);
         nextBlocked.add(key);
@@ -99,11 +104,12 @@ public final class RecipeStore {
         return true;
     }
 
-    synchronized boolean updateIf(String key, RecipeResult result, java.util.function.BooleanSupplier active) throws IOException {
+    synchronized boolean updateIf(String key, RecipeResult result, BooleanSupplier active) throws IOException {
         return updateIf(key, result, active, false);
     }
 
-    synchronized boolean updateIf(String key, RecipeResult result, java.util.function.BooleanSupplier active, boolean clearVariants) throws IOException {
+    synchronized boolean updateIf(
+            String key, RecipeResult result, BooleanSupplier active, boolean clearVariants) throws IOException {
         // Check after acquiring the writer lock: an old engine must not save after a replacement's edit.
         if (!active.getAsBoolean()) return false;
         if (result == null) remove(key); else put(key, result, clearVariants);
@@ -129,6 +135,6 @@ public final class RecipeStore {
     }
 
     private static boolean validItemId(String id) {
-        return id != null && id.matches("[a-z0-9_.-]+:[a-z0-9/._-]+");
+        return ValidationPatterns.isResourceId(id);
     }
 }

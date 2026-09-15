@@ -1,12 +1,13 @@
 package dev.rocks.infinitecraft.traits;
 
-import java.util.Set;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.util.Unit;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.equipment.Equippable;
+
+import java.util.Set;
 
 public final class GlidingTrait implements TraitDefinition {
     @Override
