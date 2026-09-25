@@ -10,6 +10,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.rocks.infinitecraft.InfiniteCraftMod;
 import dev.rocks.infinitecraft.ModConfig;
 import dev.rocks.infinitecraft.discovery.DiscoveryBook;
+import dev.rocks.infinitecraft.discovery.DiscoveryDialogs;
 import dev.rocks.infinitecraft.fusion.FusionRuntime;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.commands.CommandSourceStack;
@@ -111,7 +112,7 @@ public final class FusionCommands {
     private static int favoritePage(CommandContext<CommandSourceStack> context, int page) throws CommandSyntaxException {
         var player = context.getSource().getPlayerOrException();
         if (runtime() == null || !canOpenCollection(player)) return 0;
-        player.openDialog(Holder.direct(dev.rocks.infinitecraft.discovery.DiscoveryDialogs.createDialog(
+        player.openDialog(Holder.direct(DiscoveryDialogs.createDialog(
                 runtime().discoveries(player), page, runtime().personalBook(), 0, 1,
                 "/fusion collection favorites ", runtime().favoriteIds(player), true)));
         playBookClick(player);
@@ -235,7 +236,7 @@ public final class FusionCommands {
             if (selected.isEmpty() || entries.stream().filter(entry -> ItemStack.isSameItemSameComponents(
                     entry.result(), selected.orElseThrow().result())).count() < 2) return 0;
         }
-        player.openDialog(Holder.direct(dev.rocks.infinitecraft.discovery.DiscoveryDialogs.createDialog(
+        player.openDialog(Holder.direct(DiscoveryDialogs.createDialog(
                 entries, page, InfiniteCraftMod.personalBook(), itemId, returnPage, null, runtime().favoriteIds(player), false)));
         // Send only to the reader so browsing never makes sounds for nearby players.
         if (context.getNodes().stream().noneMatch(node -> node.getNode().getName().equals("back"))) playBookClick(player);
@@ -273,7 +274,7 @@ public final class FusionCommands {
         if (!canOpenCollection(player)) return 0;
         String query = discoverySearches.getOrDefault(player.getUUID(), "");
         var entries = DiscoveryBook.search(runtime().discoveries(player), query);
-        player.openDialog(Holder.direct(dev.rocks.infinitecraft.discovery.DiscoveryDialogs.createDialog(entries, page,
+        player.openDialog(Holder.direct(DiscoveryDialogs.createDialog(entries, page,
                 InfiniteCraftMod.personalBook(), 0, 1, "/fusion collection results ", runtime().favoriteIds(player), false)));
         if (playSound) playBookClick(player);
         return 1;

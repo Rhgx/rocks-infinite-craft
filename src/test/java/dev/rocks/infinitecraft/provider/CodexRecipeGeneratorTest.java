@@ -9,6 +9,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -58,7 +60,7 @@ class CodexRecipeGeneratorTest {
     @Test void strictSchemaUsesSparseControlsAndRejectsInvalidEntries() throws Exception {
         var plain = CodexRecipeGenerator.schema(REQUEST).getAsJsonObject("properties")
                 .getAsJsonObject("results").getAsJsonObject("items");
-        assertEquals(java.util.Set.of("itemId", "count"), plain.getAsJsonObject("properties").keySet());
+        assertEquals(Set.of("itemId", "count"), plain.getAsJsonObject("properties").keySet());
         assertEquals(2, plain.getAsJsonArray("required").size());
         var request = new GenerationRequest(REQUEST.first(), REQUEST.second(), REQUEST.candidates(), List.of("bouncy", "speedy"));
         var schema = CodexRecipeGenerator.schema(request);
@@ -78,8 +80,8 @@ class CodexRecipeGeneratorTest {
         String base = "{\"itemId\":\"minecraft:cobblestone\",\"count\":1,\"name\":null,\"traits\":[\"bouncy\"],";
         String valid = base + "\"strengths\":[{\"trait\":\"bouncy\",\"value\":0.5}],\"activations\":[{\"trait\":\"bouncy\",\"mode\":\"head\"}]}";
         var result = CodexRecipeGenerator.parseCandidates("{\"results\":[" + valid + "]}", request).getFirst();
-        assertEquals(java.util.Map.of("bouncy", .5), result.strengths());
-        assertEquals(java.util.Map.of("bouncy", "head"), result.activations());
+        assertEquals(Map.of("bouncy", .5), result.strengths());
+        assertEquals(Map.of("bouncy", "head"), result.activations());
         assertEquals("", result.name());
         var empty = CodexRecipeGenerator.parseCandidates(base + "\"strengths\":[],\"activations\":[]}", request).getFirst();
         assertTrue(empty.strengths().isEmpty());

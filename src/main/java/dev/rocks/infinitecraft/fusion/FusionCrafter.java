@@ -2,6 +2,7 @@ package dev.rocks.infinitecraft.fusion;
 
 import dev.rocks.infinitecraft.InfiniteCraftMod;
 import dev.rocks.infinitecraft.discovery.DiscoveryBook;
+import dev.rocks.infinitecraft.engine.GenerationFailure;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
@@ -241,7 +242,7 @@ public final class FusionCrafter implements AutoCloseable {
                     station.user = null;
                     if (!FusionCrafterBlock.repeats(block)) FusionCrafterBlock.setMode(block, false, true);
                 } catch (CompletionException | IllegalArgumentException error) {
-                    player.sendSystemMessage(Component.literal(dev.rocks.infinitecraft.engine.GenerationFailure.message(error)), true);
+                    player.sendSystemMessage(Component.literal(GenerationFailure.message(error)), true);
                     feedback(world, block, false, false);
                     InfiniteCraftMod.LOGGER.warn("Fusion Crafter request failed: {}", error.getClass().getSimpleName());
                 }

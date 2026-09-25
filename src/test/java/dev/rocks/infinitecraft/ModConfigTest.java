@@ -1,11 +1,14 @@
 package dev.rocks.infinitecraft;
 
+import dev.rocks.infinitecraft.provider.ProviderConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -25,7 +28,7 @@ class ModConfigTest {
         changed.maxTraits++;
         assertFalse(original.sameGeneration(changed));
         assertTrue(original.sameCatalog(changed));
-        changed.excludedIds = java.util.Set.of("minecraft:stone");
+        changed.excludedIds = Set.of("minecraft:stone");
         assertFalse(original.sameCatalog(changed));
     }
 
@@ -40,7 +43,7 @@ class ModConfigTest {
         config.personalBook = true;
         config.combineSpecialItems = true;
         assertEquals("disabled", config.provider.provider());
-        config.provider = new dev.rocks.infinitecraft.provider.ProviderConfig("openai", "", "test-model", "", 60, "test-secret");
+        config.provider = new ProviderConfig("openai", "", "test-model", "", 60, "test-secret");
         config.generationEnabled = true;
         config.firstDiscoveryMessage = false;
         config.specialDiscoveryMessage = true;
@@ -65,8 +68,8 @@ class ModConfigTest {
         config.power = 90;
         config.silliness = 10;
         config.allowModdedItems = false;
-        config.disabledTraits = java.util.Set.of("explosive");
-        config.traitChances = java.util.Map.of("hardened", 40);
+        config.disabledTraits = Set.of("explosive");
+        config.traitChances = Map.of("hardened", 40);
         config.save(file);
         ModConfig loaded = ModConfig.load(file);
         assertEquals(config.disabledTraits, loaded.disabledTraits);

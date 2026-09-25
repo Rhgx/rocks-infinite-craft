@@ -8,20 +8,24 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class HttpRecipeGeneratorTest {
     @Test void connectionTestCancellationReleasesTheTestGate() throws Exception {
-        var arrived = new java.util.concurrent.CountDownLatch(1);
-        var release = new java.util.concurrent.CountDownLatch(1);
+        var arrived = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", exchange -> {
             arrived.countDown();
-            try { release.await(5, java.util.concurrent.TimeUnit.SECONDS); }
+            try { release.await(5, TimeUnit.SECONDS); }
             catch (InterruptedException error) { Thread.currentThread().interrupt(); }
             finally { exchange.close(); }
         });
@@ -29,12 +33,12 @@ class HttpRecipeGeneratorTest {
         try {
             var config = new ProviderConfig("ollama", "http://127.0.0.1:" + server.getAddress().getPort(), "test", "", 30);
             var pending = ProviderConnectionTest.start(config);
-            assertTrue(arrived.await(5, java.util.concurrent.TimeUnit.SECONDS));
+            assertTrue(arrived.await(5, TimeUnit.SECONDS));
             assertTrue(pending.cancel(true));
-            long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
             ProviderConnectionTest.Result result;
             do {
-                result = ProviderConnectionTest.start(ProviderConfig.defaults()).get(2, java.util.concurrent.TimeUnit.SECONDS);
+                result = ProviderConnectionTest.start(ProviderConfig.defaults()).get(2, TimeUnit.SECONDS);
                 if (!result.message().contains("already running")) break;
                 Thread.sleep(10);
             } while (System.nanoTime() < deadline);
@@ -171,7 +175,7 @@ class HttpRecipeGeneratorTest {
                     var properties = results.getAsJsonObject("items").getAsJsonObject("properties");
                     assertEquals(1, properties.getAsJsonObject("count").get("minimum").getAsInt());
                     assertEquals("minecraft:cobblestone", properties.getAsJsonObject("itemId").getAsJsonArray("enum").get(0).getAsString());
-                    assertEquals(java.util.Set.of("itemId", "count"), properties.keySet());
+                    assertEquals(Set.of("itemId", "count"), properties.keySet());
                     assertEquals(JSON.toJsonTree(List.of("itemId", "count")), results.getAsJsonObject("items").get("required"));
                 }
                 if (provider.equals("gemini")) assertTrue(request.get().has("contents"));
@@ -248,7 +252,7 @@ class HttpRecipeGeneratorTest {
                 + "{\"itemId\":\"minecraft:cobblestone\",\"traits\":[\"not_allowed\"]},"
                 + "{\"itemId\":\"minecraft:cobblestone\",\"name\":123}," + valid + "]}";
         assertEquals(List.of(new RecipeResult("minecraft:cobblestone", 1, "Moon Stone", List.of("glowing"))), candidates(reply, request));
-        assertEquals(5, candidates("{\"results\":[" + String.join(",", java.util.Collections.nCopies(6, valid)) + "]}", request).size());
+        assertEquals(5, candidates("{\"results\":[" + String.join(",", Collections.nCopies(6, valid)) + "]}", request).size());
         assertEquals(List.of(new RecipeResult("minecraft:cobblestone", 1)), candidates(valid, REQUEST),
                 "Plain requests must strip unsolicited names and traits without rejecting a usable item");
         assertTrue(RecipePrompt.build(REQUEST).contains("Return ordinary items"));

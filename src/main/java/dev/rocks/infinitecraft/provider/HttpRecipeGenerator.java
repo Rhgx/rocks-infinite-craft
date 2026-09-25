@@ -20,6 +20,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
@@ -128,21 +129,21 @@ public final class HttpRecipeGenerator implements RecipeGenerator {
                 body.addProperty("input", prompt);
                 body.addProperty("store", false);
                 body.addProperty("max_output_tokens", 2048);
-                body.add("text", JSON.toJsonTree(java.util.Map.of("format", java.util.Map.of("type", "json_object"))));
+                body.add("text", JSON.toJsonTree(Map.of("format", Map.of("type", "json_object"))));
             }
             case "gemini" -> {
-                body.add("contents", JSON.toJsonTree(List.of(java.util.Map.of("role", "user", "parts", List.of(java.util.Map.of("text", prompt))))));
-                body.add("generationConfig", JSON.toJsonTree(java.util.Map.of("responseMimeType", "application/json", "maxOutputTokens", 2048)));
+                body.add("contents", JSON.toJsonTree(List.of(Map.of("role", "user", "parts", List.of(Map.of("text", prompt))))));
+                body.add("generationConfig", JSON.toJsonTree(Map.of("responseMimeType", "application/json", "maxOutputTokens", 2048)));
             }
             default -> {
-                body.add("messages", JSON.toJsonTree(List.of(java.util.Map.of("role", "user", "content", prompt))));
+                body.add("messages", JSON.toJsonTree(List.of(Map.of("role", "user", "content", prompt))));
                 if (config.provider().equals("ollama")) {
                     body.addProperty("stream", false);
                     body.addProperty("keep_alive", -1);
                     // Recipe selection needs a short answer; thinking can exhaust the output budget.
                     body.addProperty("think", false);
                     body.add("format", RecipeSchema.build(request));
-                    body.add("options", JSON.toJsonTree(java.util.Map.of("num_predict", 2048, "temperature", 0.2, "presence_penalty", 0.0, "num_ctx", 8192)));
+                    body.add("options", JSON.toJsonTree(Map.of("num_predict", 2048, "temperature", 0.2, "presence_penalty", 0.0, "num_ctx", 8192)));
                 } else { body.addProperty("max_tokens", 2048); }
             }
         }

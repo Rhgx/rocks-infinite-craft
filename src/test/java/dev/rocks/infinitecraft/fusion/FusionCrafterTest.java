@@ -24,7 +24,9 @@ import org.junit.jupiter.api.Test;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -50,7 +52,7 @@ class FusionCrafterTest {
         assertFalse(FusionCrafterBlock.marked(block));
         block.applyComponentsFromItemStack(stack);
         assertTrue(FusionCrafterBlock.marked(block));
-        var owner = java.util.UUID.randomUUID();
+        var owner = UUID.randomUUID();
         FusionCrafterBlock.setOwner(block, owner);
         assertEquals(owner, FusionCrafterBlock.owner(block));
         assertTrue(FusionCrafterBlock.repeats(block));
@@ -99,7 +101,7 @@ class FusionCrafterTest {
     }
 
     @Test void twoSlotsAllowIdenticalInputsButNotOneBulkStackOrThreeInputs() {
-        var items = new ArrayList<ItemStack>(java.util.Collections.nCopies(9, ItemStack.EMPTY));
+        var items = new ArrayList<ItemStack>(Collections.nCopies(9, ItemStack.EMPTY));
         items.set(2, new ItemStack(Items.STONE, 64));
         assertTrue(FusionCrafter.inputSlots(items).isEmpty());
         items.set(8, new ItemStack(Items.STONE));

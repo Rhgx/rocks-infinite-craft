@@ -1,6 +1,7 @@
 package dev.rocks.infinitecraft.item;
 
 import com.google.gson.JsonParser;
+import dev.rocks.infinitecraft.core.RecipeResult;
 import dev.rocks.infinitecraft.fusion.FusionRuntime;
 import org.junit.jupiter.api.Test;
 
@@ -24,8 +25,8 @@ class ComponentPairKeyTest {
             sawSecond |= !firstWins;
         }
         assertTrue(sawFirst && sawSecond);
-        var base = new dev.rocks.infinitecraft.core.RecipeResult("minecraft:stone", 1);
-        var variant = new dev.rocks.infinitecraft.core.RecipeResult("minecraft:diamond", 1);
+        var base = new RecipeResult("minecraft:stone", 1);
+        var variant = new RecipeResult("minecraft:diamond", 1);
         assertSame(variant, FusionRuntime.cachedVariantOrBase(variant, base, ignored -> false));
         assertSame(base, FusionRuntime.cachedVariantOrBase(null, base, ignored -> true));
         assertNull(FusionRuntime.cachedVariantOrBase(null, base, ignored -> false));

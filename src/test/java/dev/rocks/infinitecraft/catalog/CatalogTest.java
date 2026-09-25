@@ -4,7 +4,10 @@ import com.google.gson.JsonParser;
 import dev.rocks.infinitecraft.core.CatalogEntry;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -27,7 +30,7 @@ class CatalogTest {
     }
 
     @Test void reservesSpaceOutsideRepeatedMaterialVariants() {
-        var catalog = new java.util.ArrayList<CatalogEntry>();
+        var catalog = new ArrayList<CatalogEntry>();
         catalog.add(item("minecraft:copper", true));
         catalog.add(item("minecraft:stone", true));
         for (String variant : List.of("door", "trapdoor", "stairs", "slab", "wall", "fence", "button", "plate")) {
@@ -37,16 +40,16 @@ class CatalogTest {
         catalog.add(item("modded:engine", true));
         var result = CatalogSearch.candidates(catalog, "minecraft:copper", "minecraft:stone", 4);
         assertTrue(result.stream().anyMatch(entry -> entry.id().equals("minecraft:compass") || entry.id().equals("modded:engine")));
-        var reversed = new java.util.ArrayList<>(catalog);
-        java.util.Collections.reverse(reversed);
+        var reversed = new ArrayList<>(catalog);
+        Collections.reverse(reversed);
         assertEquals(result, CatalogSearch.candidates(reversed, "minecraft:stone", "minecraft:copper", 4));
     }
 
     @Test void compatibleOutputFilterDoesNotChangeThePreparedIndex() {
         var index = new CatalogSearch.Index(CATALOG);
         assertEquals(List.of(item("example:copper_plate", true)), index.candidates(
-                "example:copper_gear", "minecraft:stone", 20, java.util.Set.of("example:copper_plate")));
-        assertTrue(index.candidates("example:copper_gear", "minecraft:stone", 20, java.util.Set.of()).isEmpty());
+                "example:copper_gear", "minecraft:stone", 20, Set.of("example:copper_plate")));
+        assertTrue(index.candidates("example:copper_gear", "minecraft:stone", 20, Set.of()).isEmpty());
         assertEquals(3, index.candidates("example:copper_gear", "minecraft:stone", 20).size());
     }
 

@@ -2,7 +2,9 @@ package dev.rocks.infinitecraft.engine;
 
 import dev.rocks.infinitecraft.core.CatalogEntry;
 import dev.rocks.infinitecraft.core.GenerationRequest;
+import dev.rocks.infinitecraft.core.InvalidRecipeResponseException;
 import dev.rocks.infinitecraft.core.PairKey;
+import dev.rocks.infinitecraft.core.RecipeGenerator;
 import dev.rocks.infinitecraft.core.RecipeResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -13,6 +15,8 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RejectedExecutionException;
@@ -198,7 +202,7 @@ class RecipeEngineTest {
             var second = engine.resolve(request("minecraft:c", "minecraft:d"), Map.of());
             assertTrue(bothStarted.await(2, TimeUnit.SECONDS));
             engine.cancelRecipe(firstKey);
-            assertThrows(java.util.concurrent.CompletionException.class, first::join);
+            assertThrows(CompletionException.class, first::join);
             assertTrue(wasInterrupted.await(2, TimeUnit.SECONDS));
             assertEquals(1, interrupted.get());
             release.countDown();
@@ -209,7 +213,7 @@ class RecipeEngineTest {
     @Test void invalidGenerationIsNotCachedAndMayBeRetried() throws Exception {
         AtomicInteger calls = new AtomicInteger();
         RecipeStore store = new RecipeStore(directory.resolve("recipes.json"));
-        try (RecipeEngine engine = new RecipeEngine(store, new dev.rocks.infinitecraft.core.RecipeGenerator() {
+        try (RecipeEngine engine = new RecipeEngine(store, new RecipeGenerator() {
             public RecipeResult generate(GenerationRequest request) { throw new AssertionError(); }
             public List<RecipeResult> generateCandidates(GenerationRequest request, String feedback) {
                 int call = calls.incrementAndGet();
@@ -227,7 +231,7 @@ class RecipeEngineTest {
         AtomicInteger calls = new AtomicInteger();
         var result = new RecipeResult("minecraft:stone", 1, "Named stone", List.of("bouncy"), Map.of("bouncy", .35));
         RecipeStore store = new RecipeStore(directory.resolve("recipes.json"));
-        var generator = new dev.rocks.infinitecraft.core.RecipeGenerator() {
+        var generator = new RecipeGenerator() {
             public RecipeResult generate(GenerationRequest request) { return STONE; }
             public List<RecipeResult> generateCandidates(GenerationRequest request) {
                 calls.incrementAndGet(); return List.of(STONE, result);
@@ -247,7 +251,7 @@ class RecipeEngineTest {
         RecipeStore store = new RecipeStore(file);
         String first = "minecraft:a", second = "minecraft:b", key = PairKey.of(first, second);
         try (RecipeEngine engine = new RecipeEngine(store, ignored -> {
-            calls.incrementAndGet(); throw new dev.rocks.infinitecraft.core.InvalidRecipeResponseException();
+            calls.incrementAndGet(); throw new InvalidRecipeResponseException();
         }, 2, 3)) {
             assertThrows(ExecutionException.class, () -> engine.resolve(request(first, second), Map.of()).get(2, TimeUnit.SECONDS));
             assertEquals(3, calls.get());
@@ -278,7 +282,7 @@ class RecipeEngineTest {
         AtomicInteger calls = new AtomicInteger();
         try (RecipeEngine engine = new RecipeEngine(store, ignored -> {
             calls.incrementAndGet(); started.countDown(); release.await();
-            throw new dev.rocks.infinitecraft.core.InvalidRecipeResponseException();
+            throw new InvalidRecipeResponseException();
         }, 3)) {
             var pending = engine.resolve(request(first, second), Map.of());
             assertTrue(started.await(2, TimeUnit.SECONDS));
@@ -304,7 +308,7 @@ class RecipeEngineTest {
         }
         try (RecipeEngine engine = new RecipeEngine(store, ignored -> STONE, 2)) {
             assertThrows(ExecutionException.class, () -> engine.resolveVariant(request(first, second), Set.of("minecraft:stone"),
-                    recipe -> { throw new java.util.concurrent.CancellationException(); }, key + "#cancelled").get(2, TimeUnit.SECONDS));
+                    recipe -> { throw new CancellationException(); }, key + "#cancelled").get(2, TimeUnit.SECONDS));
             assertFalse(store.isBlocked(key + "#cancelled"));
             assertThrows(ExecutionException.class, () -> engine.resolveVariant(request(first, second), Set.of("minecraft:stone"),
                     recipe -> false, key + "#variant").get(2, TimeUnit.SECONDS));

@@ -1,5 +1,8 @@
 package dev.rocks.infinitecraft.traits;
 
+import dev.rocks.infinitecraft.core.PairKey;
+import dev.rocks.infinitecraft.fusion.FusionCount;
+import dev.rocks.infinitecraft.item.ItemTraits;
 import dev.rocks.infinitecraft.item.VanillaTraits;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.component.DataComponents;
@@ -12,8 +15,10 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.consume_effects.ApplyStatusEffectsConsumeEffect;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -29,7 +34,7 @@ class TriggeredTraitsTest {
     }
     @Test
     void luckyRollsAreStableAndCoverThirteenOutcomes() {
-        var outcomes = new java.util.HashSet<Integer>();
+        var outcomes = new HashSet<Integer>();
         for (int roll = 0; roll < 100; roll++) outcomes.add(LuckyBlockTrait.outcome(roll));
         assertEquals(13, outcomes.size());
         assertEquals(12, LuckyBlockTrait.outcome(99));
@@ -37,9 +42,9 @@ class TriggeredTraitsTest {
         assertEquals(0, LuckyBlockTrait.outcome(1));
         assertEquals(1, LuckyBlockTrait.outcome(2));
         assertEquals(1, LuckyBlockTrait.outcome(3));
-        String pair = dev.rocks.infinitecraft.core.PairKey.of("minecraft:stone", "minecraft:dirt");
+        String pair = PairKey.of("minecraft:stone", "minecraft:dirt");
         assertEquals(LuckyBlockTrait.appears(pair, 17), LuckyBlockTrait.appears(
-                dev.rocks.infinitecraft.core.PairKey.of("minecraft:dirt", "minecraft:stone"), 17));
+                PairKey.of("minecraft:dirt", "minecraft:stone"), 17));
         int lucky = 0;
         for (int seed = 0; seed < 10000; seed++) if (LuckyBlockTrait.appears(pair, seed)) lucky++;
         assertTrue(lucky > 350 && lucky < 650);
@@ -53,14 +58,14 @@ class TriggeredTraitsTest {
         var original = scoreboard.addPlayerTeam("friends");
         scoreboard.addPlayerToTeam("Rocks", original);
         original.setPlayerPrefix(net.minecraft.network.chat.Component.literal("[Friends] "));
-        original.setColor(java.util.Optional.of(net.minecraft.world.scores.TeamColor.BLUE));
+        original.setColor(Optional.of(net.minecraft.world.scores.TeamColor.BLUE));
         original.setAllowFriendlyFire(false);
         original.setNameTagVisibility(net.minecraft.world.scores.Team.Visibility.NEVER);
         var display = new net.minecraft.world.scores.PlayerTeam(new net.minecraft.world.scores.Scoreboard(), "star");
         LuckyBlockEffects.copySettings(original, display);
-        display.setColor(java.util.Optional.of(net.minecraft.world.scores.TeamColor.RED));
+        display.setColor(Optional.of(net.minecraft.world.scores.TeamColor.RED));
         assertSame(original, scoreboard.getPlayersTeam("Rocks"));
-        assertEquals(java.util.Optional.of(net.minecraft.world.scores.TeamColor.BLUE), original.getColor());
+        assertEquals(Optional.of(net.minecraft.world.scores.TeamColor.BLUE), original.getColor());
         assertEquals(original.getPlayerPrefix(), display.getPlayerPrefix());
         assertFalse(display.isAllowFriendlyFire());
         assertEquals(original.getNameTagVisibility(), display.getNameTagVisibility());
@@ -77,11 +82,11 @@ class TriggeredTraitsTest {
                 .forEach(pending -> pending.apply());
         var lucky = VanillaTraits.apply(new ItemStack(Items.STONE), List.of("lucky_block"), "");
         assertFalse(lucky.isEmpty());
-        assertTrue(dev.rocks.infinitecraft.fusion.FusionCount.apply(lucky, ItemStack.EMPTY, ItemStack.EMPTY,
-                stack -> stack == lucky));
-        assertTrue(dev.rocks.infinitecraft.item.ItemTraits.apply(lucky, ItemStack.EMPTY, ItemStack.EMPTY,
+        assertTrue(FusionCount.apply(lucky, ItemStack.EMPTY, ItemStack.EMPTY,
+                stack -> stack == lucky, FusionCount.LIMIT));
+        assertTrue(ItemTraits.apply(lucky, ItemStack.EMPTY, ItemStack.EMPTY,
                 List.of("lucky_block"), 1));
-        assertTrue(dev.rocks.infinitecraft.fusion.FusionCount.supportedData(lucky));
+        assertTrue(FusionCount.supportedData(lucky));
         assertTrue(ItemStack.validateStrict(lucky).result().isPresent());
         var apple = new ItemStack(Items.APPLE);
         var food = VanillaTraits.apply(apple, List.of("nibbleable", "hearty_food"), "", Map.of("nibbleable", 0.0));

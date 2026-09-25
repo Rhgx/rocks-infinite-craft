@@ -1,7 +1,10 @@
 package dev.rocks.infinitecraft.item;
 
 import com.mojang.serialization.JsonOps;
+import dev.rocks.infinitecraft.core.NamePart;
+import dev.rocks.infinitecraft.core.NameStyle;
 import dev.rocks.infinitecraft.fusion.FusionRuntime;
+import dev.rocks.infinitecraft.traits.TraitRegistry;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponents;
@@ -18,6 +21,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -40,10 +44,10 @@ class VanillaTraitsTest {
 
     @Test void chosenActivationControlsSlotsConsumptionAndInheritance() {
         var parts = List.of(
-                new dev.rocks.infinitecraft.core.NamePart("Lost ", new dev.rocks.infinitecraft.core.NameStyle("#FFAA00", true, false, true, false, true)),
-                new dev.rocks.infinitecraft.core.NamePart("Rune", dev.rocks.infinitecraft.core.NameStyle.PLAIN));
-        var named = VanillaTraits.apply(new ItemStack(Items.STICK), List.of(), "Lost Rune", java.util.Map.of(),
-                java.util.Map.of(), dev.rocks.infinitecraft.core.NameStyle.PLAIN, parts);
+                new NamePart("Lost ", new NameStyle("#FFAA00", true, false, true, false, true)),
+                new NamePart("Rune", NameStyle.PLAIN));
+        var named = VanillaTraits.apply(new ItemStack(Items.STICK), List.of(), "Lost Rune", Map.of(),
+                Map.of(), NameStyle.PLAIN, parts);
         var name = named.get(DataComponents.CUSTOM_NAME);
         assertEquals("Lost Rune", name.getString());
         assertTrue(name.getSiblings().getFirst().getStyle().isObfuscated());
@@ -54,24 +58,24 @@ class VanillaTraitsTest {
         var roundTrip = ItemStack.CODEC.parse(nameOps, ItemStack.CODEC.encodeStart(nameOps, named).getOrThrow()).getOrThrow();
         assertTrue(ItemStack.isSameItemSameComponents(named, roundTrip));
 
-        var plain = dev.rocks.infinitecraft.core.NameStyle.PLAIN;
+        var plain = NameStyle.PLAIN;
         var stick = new ItemStack(Items.STICK);
-        var offhand = VanillaTraits.apply(stick, List.of("speedy"), "", java.util.Map.of(),
-                java.util.Map.of("speedy", "offhand"), plain);
+        var offhand = VanillaTraits.apply(stick, List.of("speedy"), "", Map.of(),
+                Map.of("speedy", "offhand"), plain);
         var modifiers = offhand.get(DataComponents.ATTRIBUTE_MODIFIERS);
         assertEquals(.1, modifiers.compute(Attributes.MOVEMENT_SPEED, .1, EquipmentSlot.MAINHAND), .00001);
         assertTrue(modifiers.compute(Attributes.MOVEMENT_SPEED, .1, EquipmentSlot.OFFHAND) > .1);
-        var mainhand = VanillaTraits.apply(offhand, List.of("speedy"), "", java.util.Map.of(),
-                java.util.Map.of("speedy", "mainhand"), plain);
+        var mainhand = VanillaTraits.apply(offhand, List.of("speedy"), "", Map.of(),
+                Map.of("speedy", "mainhand"), plain);
         assertTrue(mainhand.get(DataComponents.LORE).lines().isEmpty());
         var inherited = ItemDataFusion.prepare(new ItemStack(Items.DIAMOND), offhand, stick, false);
         assertEquals(modifiers, inherited.get(DataComponents.ATTRIBUTE_MODIFIERS));
-        var worn = VanillaTraits.apply(stick, List.of("bouncy"), "", java.util.Map.of(),
-                java.util.Map.of("bouncy", "head"), plain);
+        var worn = VanillaTraits.apply(stick, List.of("bouncy"), "", Map.of(),
+                Map.of("bouncy", "head"), plain);
         assertEquals(EquipmentSlot.HEAD, worn.get(DataComponents.EQUIPPABLE).slot());
         assertFalse(ItemDataFusion.prepare(new ItemStack(Items.DIAMOND), worn, stick, false).isEmpty());
-        var eaten = VanillaTraits.apply(offhand, List.of("speedy"), "", java.util.Map.of("speedy", 1.0),
-                java.util.Map.of("speedy", "consumed"), plain);
+        var eaten = VanillaTraits.apply(offhand, List.of("speedy"), "", Map.of("speedy", 1.0),
+                Map.of("speedy", "consumed"), plain);
         assertFalse(eaten.isEmpty());
         assertTrue(eaten.get(DataComponents.ATTRIBUTE_MODIFIERS).modifiers().isEmpty());
         assertEquals(List.of("Edible"), eaten.get(DataComponents.LORE).lines().stream().map(line -> line.getString()).toList());
@@ -79,25 +83,25 @@ class VanillaTraitsTest {
                 eaten.get(DataComponents.CONSUMABLE).onConsumeEffects().getFirst();
         assertEquals(400, effect.effects().getFirst().getDuration());
         assertEquals(2, effect.effects().getFirst().getAmplifier());
-        var intense = VanillaTraits.apply(stick, List.of("speedy"), "", java.util.Map.of("speedy", 1.0),
-                java.util.Map.of("speedy", "consumed_intense"), plain);
+        var intense = VanillaTraits.apply(stick, List.of("speedy"), "", Map.of("speedy", 1.0),
+                Map.of("speedy", "consumed_intense"), plain);
         var intenseEffect = (net.minecraft.world.item.consume_effects.ApplyStatusEffectsConsumeEffect)
                 intense.get(DataComponents.CONSUMABLE).onConsumeEffects().getFirst();
         assertEquals(160, intenseEffect.effects().getFirst().getDuration());
         assertEquals(3, intenseEffect.effects().getFirst().getAmplifier());
         assertFalse(ItemDataFusion.prepare(new ItemStack(Items.DIAMOND), eaten, stick, false).isEmpty());
-        var heldAgain = VanillaTraits.apply(eaten, List.of("speedy"), "", java.util.Map.of(),
-                java.util.Map.of("speedy", "mainhand"), plain);
+        var heldAgain = VanillaTraits.apply(eaten, List.of("speedy"), "", Map.of(),
+                Map.of("speedy", "mainhand"), plain);
         assertTrue(heldAgain.get(DataComponents.CONSUMABLE).onConsumeEffects().isEmpty());
-        assertTrue(VanillaTraits.apply(stick, List.of("bouncy", "speedy"), "", java.util.Map.of(),
-                java.util.Map.of("bouncy", "head", "speedy", "consumed"), plain).isEmpty());
-        var sharedSlot = VanillaTraits.apply(stick, List.of("bouncy", "speedy"), "", java.util.Map.of(),
-                java.util.Map.of("bouncy", "head", "speedy", "feet"), plain);
+        assertTrue(VanillaTraits.apply(stick, List.of("bouncy", "speedy"), "", Map.of(),
+                Map.of("bouncy", "head", "speedy", "consumed"), plain).isEmpty());
+        var sharedSlot = VanillaTraits.apply(stick, List.of("bouncy", "speedy"), "", Map.of(),
+                Map.of("bouncy", "head", "speedy", "feet"), plain);
         assertEquals(EquipmentSlot.HEAD, sharedSlot.get(DataComponents.EQUIPPABLE).slot());
         assertTrue(sharedSlot.get(DataComponents.ATTRIBUTE_MODIFIERS).modifiers().stream()
                 .allMatch(entry -> entry.slot() == EquipmentSlotGroup.HEAD));
-        assertTrue(VanillaTraits.apply(stick, List.of("bouncy"), "", java.util.Map.of(),
-                java.util.Map.of("bouncy", "consumed"), plain).isEmpty());
+        assertTrue(VanillaTraits.apply(stick, List.of("bouncy"), "", Map.of(),
+                Map.of("bouncy", "consumed"), plain).isEmpty());
     }
 
     @Test void quantitiesSplitIntoValidStacksWithoutLosingSpecialComponents() {
@@ -150,9 +154,9 @@ class VanillaTraitsTest {
     @Test void allTraitsRoundTripThroughNativeStackCodec() {
         var ops = lookup.createSerializationContext(JsonOps.INSTANCE);
         for (String trait : VanillaTraits.ids()) for (String activation :
-                dev.rocks.infinitecraft.traits.TraitRegistry.get(trait).activationModes()) {
+                TraitRegistry.get(trait).activationModes()) {
             var result = VanillaTraits.apply(new ItemStack(Items.STICK, 5), List.of(trait), "Test " + trait,
-                    java.util.Map.of(), java.util.Map.of(trait, activation), new dev.rocks.infinitecraft.core.NameStyle("#55FF55", true, true));
+                    Map.of(), Map.of(trait, activation), new NameStyle("#55FF55", true, true));
             assertFalse(result.isEmpty(), trait);
             assertFalse(ItemDataFusion.prepare(new ItemStack(Items.STICK), result, new ItemStack(Items.COAL), false).isEmpty(), trait);
             assertTrue(result.getCustomName().getStyle().isBold());
@@ -190,16 +194,16 @@ class VanillaTraitsTest {
         assertNotNull(reach.get(DataComponents.ATTACK_RANGE));
         assertEquals(reach.get(DataComponents.ATTACK_RANGE), VanillaTraits.apply(reach, List.of("long_reach"), null).get(DataComponents.ATTACK_RANGE));
 
-        var added = java.util.Map.of(
+        var added = Map.of(
                 "tough", Attributes.ARMOR_TOUGHNESS,
                 "healthy", Attributes.MAX_HEALTH,
                 "soft_landing", Attributes.SAFE_FALL_DISTANCE,
                 "gilled", Attributes.OXYGEN_BONUS,
                 "sweeping", Attributes.SWEEPING_DAMAGE_RATIO);
         for (var entry : added.entrySet()) {
-            var trait = dev.rocks.infinitecraft.traits.TraitRegistry.get(entry.getKey());
+            var trait = TraitRegistry.get(entry.getKey());
             var item = VanillaTraits.apply(new ItemStack(Items.STICK), List.of(entry.getKey()), null,
-                    java.util.Map.of(entry.getKey(), 1.0), java.util.Map.of(), dev.rocks.infinitecraft.core.NameStyle.PLAIN);
+                    Map.of(entry.getKey(), 1.0), Map.of(), NameStyle.PLAIN);
             var value = item.get(DataComponents.ATTRIBUTE_MODIFIERS)
                     .compute(entry.getValue(), entry.getValue().value().getDefaultValue(), EquipmentSlot.MAINHAND);
             assertEquals(entry.getValue().value().getDefaultValue() + trait.range().maximum(), value, .00001, entry.getKey());

@@ -64,10 +64,6 @@ public final class FusionCount {
         return line.getString().startsWith("Combinations: ");
     }
 
-    private static Component line(int count) {
-        return line(count, LIMIT);
-    }
-
     private static Component line(int count, int limit) {
         double progress = limit == 0 ? 0 : (double) count / limit;
         int color = progress < 0.6 ? 0xFFFFFF : progress < 1 ? 0xFFFF55 : 0xFF5555;
@@ -78,10 +74,6 @@ public final class FusionCount {
 
     public static boolean apply(ItemStack output, ItemStack first, ItemStack second) {
         return apply(output, first, second, ItemDataFusion::specialIngredient, LIMIT);
-    }
-
-    public static boolean apply(ItemStack output, ItemStack first, ItemStack second, Predicate<ItemStack> special) {
-        return apply(output, first, second, special, LIMIT);
     }
 
     public static boolean apply(ItemStack output, ItemStack first, ItemStack second,
