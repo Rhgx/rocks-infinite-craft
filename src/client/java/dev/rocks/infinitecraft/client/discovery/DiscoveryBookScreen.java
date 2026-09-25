@@ -24,14 +24,16 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.ResolvableProfile;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** An open two-page book: discoveries listed on the left page, the selected one's recipes on the right. */
+/** An open two-page book: discoveries listed on the left page, the selected one's recipes and uses on the right. */
 final class DiscoveryBookScreen extends Screen {
     private static final Identifier TEXTURE = Identifier.fromNamespaceAndPath("rocks_infinite_craft",
             "textures/gui/discovery_book.png");
@@ -48,6 +50,7 @@ final class DiscoveryBookScreen extends Screen {
     private static final int FAINT = 0xFF8C7A5B;
     private static final int HEADING = 0xFF8A3F25;
     private static final int STAR = 0xFFFFAA00;
+    private static final int STAR_HOVER = 0xFFFFC94A;
     private static final int AMETHYST = 0xFF5D3A9A;
     // Page geometry, relative to the book's top-left corner.
     private static final int LEFT_PAGE = 14;
@@ -55,13 +58,34 @@ final class DiscoveryBookScreen extends Screen {
     private static final int PAGE_WIDTH = 114;
     private static final int LIST_Y = 30;
     private static final int RECIPES_Y = 82;
+    // The divider under the name: "---- 3 recipes ----", or "Made from · Used in" tabs once the item is used anywhere.
+    private static final int TABS_Y = 69;
+    private static final String MADE = "Made from";
+    private static final String USED = "Used in";
+    private static final String SEPARATOR = " · ";
+
+    private enum Sort {
+        NEWEST("New", "newest first"), OLDEST("Old", "oldest first"), NAME("A-Z", "by name");
+        final String label;
+        final String description;
+        Sort(String label, String description) {
+            this.label = label;
+            this.description = description;
+        }
+    }
+    // Kept across openings for the rest of the session.
+    private static Sort sort = Sort.NEWEST;
 
     private final List<DiscoveryCollection.Entry> recipes;
     private final Map<DiscoveryCollection.ResultKey, List<DiscoveryCollection.Entry>> recipesByResult;
     private final Map<DiscoveryCollection.ResultKey, DiscoveryCollection.Entry> discoveredOutputs;
+    private final Map<DiscoveryCollection.ResultKey, List<DiscoveryCollection.Entry>> usesByIngredient = new LinkedHashMap<>();
     private final boolean personal;
     private final Set<Integer> favorites;
     private boolean favoritesOnly;
+    // The right page lists recipes that use the selected item instead of ones that make it.
+    private boolean showingUses;
+    private InkButton sortButton;
     private InkButton favoriteButton;
     private InkButton favoritesFilter;
     private List<DiscoveryCollection.Entry> results = List.of();
@@ -85,6 +109,12 @@ final class DiscoveryBookScreen extends Screen {
                 Map.Entry::getKey, entry -> entry.getValue().getFirst()));
         this.personal = personal;
         this.favorites = new HashSet<>(favorites);
+        for (var recipe : this.recipes) {
+            var first = new DiscoveryCollection.ResultKey(recipe.first());
+            var second = new DiscoveryCollection.ResultKey(recipe.second());
+            usesByIngredient.computeIfAbsent(first, ignored -> new ArrayList<>()).add(recipe);
+            if (!second.equals(first)) usesByIngredient.computeIfAbsent(second, ignored -> new ArrayList<>()).add(recipe);
+        }
     }
 
     @Override
@@ -94,7 +124,7 @@ final class DiscoveryBookScreen extends Screen {
         left = (width - BOOK_WIDTH) / 2;
         top = Math.max(2, (height - BOOK_HEIGHT - 26) / 2);
 
-        searchBox = new EditBox(font, left + LEFT_PAGE + 17, top + 15, 80, 10, Component.literal("Search discoveries"));
+        searchBox = new EditBox(font, left + LEFT_PAGE + 17, top + 15, 62, 10, Component.literal("Search discoveries"));
         searchBox.setBordered(false);
         searchBox.setTextColor(INK);
         searchBox.setTextShadow(false);
@@ -111,15 +141,22 @@ final class DiscoveryBookScreen extends Screen {
         addRenderableWidget(searchBox);
         setInitialFocus(searchBox);
 
+        sortButton = addRenderableWidget(new InkButton(left + LEFT_PAGE + PAGE_WIDTH - 33, top + 12, 20, 14,
+                FAINT, HEADING, button -> {
+                    sort = Sort.values()[(sort.ordinal() + 1) % Sort.values().length];
+                    page = 0;
+                    selected = null;
+                    refreshRows();
+                }));
         favoritesFilter = addRenderableWidget(new InkButton(left + LEFT_PAGE + PAGE_WIDTH - 12, top + 12, 12, 14,
-                button -> {
+                STAR, STAR_HOVER, button -> {
                     favoritesOnly = !favoritesOnly;
                     page = 0;
                     selected = null;
                     refreshRows();
                 }));
         favoriteButton = addRenderableWidget(new InkButton(left + RIGHT_PAGE + PAGE_WIDTH - 12, top + 12, 12, 14,
-                button -> {
+                STAR, STAR_HOVER, button -> {
                     if (selected == null || minecraft.player == null) return;
                     minecraft.player.connection.sendCommand("fusion favorite " + selected.id());
                     boolean remove = favorites.contains(selected.id());
@@ -156,6 +193,7 @@ final class DiscoveryBookScreen extends Screen {
         int index = page * ROWS + row;
         if (index >= results.size()) return;
         selected = results.get(index);
+        showingUses = false;
         detailScroll = 0;
         refreshRows();
     }
@@ -165,7 +203,7 @@ final class DiscoveryBookScreen extends Screen {
     }
 
     private void refreshRows() {
-        results = DiscoveryCollection.uniqueResults(filteredRecipes()).reversed();
+        results = sorted(DiscoveryCollection.uniqueResults(filteredRecipes()));
         page = Math.clamp(page, 0, pages() - 1);
         for (int row = 0; row < rowButtons.size(); row++) {
             int index = page * ROWS + row;
@@ -175,6 +213,10 @@ final class DiscoveryBookScreen extends Screen {
         }
         if (previousButton != null) previousButton.visible = page > 0;
         if (nextButton != null) nextButton.visible = page + 1 < pages();
+        if (sortButton != null) {
+            sortButton.setMessage(Component.literal(sort.label));
+            sortButton.setTooltip(Tooltip.create(Component.literal("Sorted " + sort.description + ". Click to change.")));
+        }
         if (favoritesFilter != null) {
             favoritesFilter.setMessage(Component.literal(favoritesOnly ? "★" : "☆"));
             favoritesFilter.setTooltip(Tooltip.create(Component.literal(favoritesOnly
@@ -193,6 +235,34 @@ final class DiscoveryBookScreen extends Screen {
                 .filter(entry -> !favoritesOnly || favorites.contains(entry.id())).toList();
     }
 
+    private static List<DiscoveryCollection.Entry> sorted(List<DiscoveryCollection.Entry> unique) {
+        return switch (sort) {
+            case NEWEST -> unique.reversed();
+            case OLDEST -> unique;
+            case NAME -> unique.stream().sorted(Comparator.comparing(
+                    (DiscoveryCollection.Entry entry) -> entry.result().getHoverName().getString(),
+                    String.CASE_INSENSITIVE_ORDER)).toList();
+        };
+    }
+
+    private List<DiscoveryCollection.Entry> uses(DiscoveryCollection.Entry entry) {
+        return usesByIngredient.getOrDefault(new DiscoveryCollection.ResultKey(entry.result()), List.of());
+    }
+
+    /** What the right page lists for the selection: recipes that make it, or recipes that use it. */
+    private List<DiscoveryCollection.Entry> shownRecipes() {
+        return showingUses ? uses(selected) : alternatives(selected);
+    }
+
+    /** The slots of one recipe row. Uses read "selected + other = result", with the selected item first. */
+    private List<ItemStack> slots(DiscoveryCollection.Entry recipe) {
+        if (!showingUses) return List.of(recipe.first(), recipe.second());
+        var key = new DiscoveryCollection.ResultKey(selected.result());
+        return new DiscoveryCollection.ResultKey(recipe.first()).equals(key)
+                ? List.of(recipe.first(), recipe.second(), recipe.result())
+                : List.of(recipe.second(), recipe.first(), recipe.result());
+    }
+
     private List<DiscoveryCollection.Entry> alternatives(DiscoveryCollection.Entry entry) {
         return recipesByResult.getOrDefault(new DiscoveryCollection.ResultKey(entry.result()), List.of());
     }
@@ -207,8 +277,9 @@ final class DiscoveryBookScreen extends Screen {
         query = "";
         favoritesOnly = false;
         if (searchBox != null) searchBox.setValue("");
-        results = DiscoveryCollection.uniqueResults(recipes).reversed();
+        results = sorted(DiscoveryCollection.uniqueResults(recipes));
         selected = target;
+        showingUses = false;
         detailScroll = 0;
         int index = results.indexOf(target);
         page = index < 0 ? 0 : index / ROWS;
@@ -216,7 +287,7 @@ final class DiscoveryBookScreen extends Screen {
         minecraft.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.BOOK_PAGE_TURN, 1));
     }
 
-    // Recipe rows on the right page: two ingredient slots joined by a plus, then an optional Share link.
+    // Recipe rows on the right page: slots 34 pixels apart joined by + and =, then an optional Share link.
     private int recipeX() { return left + RIGHT_PAGE + 4; }
     private int recipeY(int visibleIndex) { return top + RECIPES_Y + visibleIndex * RECIPE_HEIGHT; }
     private static boolean inside(double mouseX, double mouseY, int x, int y, int width, int height) {
@@ -224,13 +295,20 @@ final class DiscoveryBookScreen extends Screen {
     }
 
     private List<DiscoveryCollection.Entry> visibleRecipes() {
-        return alternatives(selected).stream().skip(detailScroll).limit(RECIPES).toList();
+        return shownRecipes().stream().skip(detailScroll).limit(RECIPES).toList();
     }
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         if (selected != null && event.button() == 0) {
-            int count = alternatives(selected).size();
+            var tab = hoveredTab(event.x(), event.y());
+            if (tab != null) {
+                showingUses = tab;
+                detailScroll = 0;
+                minecraft.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.BOOK_PAGE_TURN, 1));
+                return true;
+            }
+            int count = shownRecipes().size();
             if (count > RECIPES && overDetailScrollbar(event.x(), event.y())) {
                 draggingDetailScrollbar = true;
                 scrollDetailsTo(event.y(), count);
@@ -241,15 +319,14 @@ final class DiscoveryBookScreen extends Screen {
             for (int index = 0; index < visible.size(); index++) {
                 var recipe = visible.get(index);
                 int y = recipeY(index);
-                for (var ingredient : List.of(recipe.first(), recipe.second())) {
-                    if (inside(event.x(), event.y(), x, y, 18, 18) && discoveredOutput(ingredient) != null) {
-                        openIngredient(ingredient);
+                var slots = slots(recipe);
+                for (int slot = 0; slot < slots.size(); slot++) {
+                    if (inside(event.x(), event.y(), x + slot * 34, y, 18, 18) && discoveredOutput(slots.get(slot)) != null) {
+                        openIngredient(slots.get(slot));
                         return true;
                     }
-                    x += 34;
                 }
-                x = recipeX();
-                if (personal && inside(event.x(), event.y(), x + 74, y + 3, font.width("Share"), 12)) {
+                if (!showingUses && personal && inside(event.x(), event.y(), x + 74, y + 3, font.width("Share"), 12)) {
                     if (minecraft.player != null) minecraft.player.connection.sendCommand("fusion share " + recipe.id());
                     onClose();
                     return true;
@@ -262,7 +339,7 @@ final class DiscoveryBookScreen extends Screen {
     @Override
     public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
         if (draggingDetailScrollbar && selected != null) {
-            scrollDetailsTo(event.y(), alternatives(selected).size());
+            scrollDetailsTo(event.y(), shownRecipes().size());
             return true;
         }
         return super.mouseDragged(event, dragX, dragY);
@@ -310,7 +387,7 @@ final class DiscoveryBookScreen extends Screen {
             return true;
         }
         if (selected != null && inside(mouseX, mouseY, left + RIGHT_PAGE, top + RECIPES_Y - 4, PAGE_WIDTH, RECIPES * RECIPE_HEIGHT + 4)) {
-            detailScroll = Math.clamp(detailScroll + step, 0, Math.max(0, alternatives(selected).size() - RECIPES));
+            detailScroll = Math.clamp(detailScroll + step, 0, Math.max(0, shownRecipes().size() - RECIPES));
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, horizontal, vertical);
@@ -322,8 +399,8 @@ final class DiscoveryBookScreen extends Screen {
         graphics.blit(RenderPipelines.GUI_TEXTURED, TEXTURE, left, top, 0, 0, BOOK_WIDTH, BOOK_HEIGHT, BOOK_WIDTH, BOOK_HEIGHT);
         // Search field: a faint inked underline with the vanilla magnifier.
         int x = left + LEFT_PAGE;
-        graphics.fill(x, top + 12, x + PAGE_WIDTH - 14, top + 26, 0x14000000);
-        graphics.fill(x, top + 25, x + PAGE_WIDTH - 14, top + 26, 0x40000000);
+        graphics.fill(x, top + 12, x + PAGE_WIDTH - 35, top + 26, 0x14000000);
+        graphics.fill(x, top + 25, x + PAGE_WIDTH - 35, top + 26, 0x40000000);
         graphics.blitSprite(RenderPipelines.GUI_TEXTURED, SEARCH, x + 2, top + 13, 12, 12);
     }
 
@@ -376,16 +453,21 @@ final class DiscoveryBookScreen extends Screen {
         graphics.text(font, text, centerX - font.width(text) / 2, y, color, false);
     }
 
-    /** A text-only button inked straight onto the page, for the star toggles. */
+    /** A text-only button inked straight onto the page, for the sort and star toggles. */
     private final class InkButton extends Button {
-        InkButton(int x, int y, int width, int height, OnPress onPress) {
+        private final int color;
+        private final int hoverColor;
+
+        InkButton(int x, int y, int width, int height, int color, int hoverColor, OnPress onPress) {
             super(x, y, width, height, Component.empty(), onPress, DEFAULT_NARRATION);
+            this.color = color;
+            this.hoverColor = hoverColor;
         }
 
         @Override
         protected void extractContents(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
             // Hover only: after a click the button keeps focus, which should not change its color.
-            int color = isHovered() ? 0xFFFFC94A : STAR;
+            int color = isHovered() ? hoverColor : this.color;
             graphics.text(font, getMessage(), getX() + (width - font.width(getMessage())) / 2,
                     getY() + (height - 8) / 2, color, false);
             if (isHovered()) graphics.requestCursor(CursorTypes.POINTING_HAND);
@@ -464,31 +546,27 @@ final class DiscoveryBookScreen extends Screen {
             graphics.text(font, text, center - font.width(text) / 2, top + 48 + line * 9, INK, false);
         }
 
-        // Recipe count set into the divider: ---- 1 recipe ----
         var alternatives = alternatives(selected);
-        String count = alternatives.size() + (alternatives.size() == 1 ? " recipe" : " recipes");
-        int half = font.width(count) / 2 + 4;
-        graphics.text(font, count, center - font.width(count) / 2, top + 69, FAINT, false);
-        graphics.fill(x + 4, top + 73, center - half, top + 74, 0x30000000);
-        graphics.fill(center + half, top + 73, x + PAGE_WIDTH - 4, top + 74, 0x30000000);
+        drawTabs(graphics, alternatives.size(), mouseX, mouseY);
 
         var visible = visibleRecipes();
         for (int index = 0; index < visible.size(); index++) {
             var recipe = visible.get(index);
             int y = recipeY(index);
-            int slotX = recipeX();
-            for (var ingredient : List.of(recipe.first(), recipe.second())) {
-                var shown = DiscoveryBook.displayStack(ingredient);
+            var slots = slots(recipe);
+            for (int slot = 0; slot < slots.size(); slot++) {
+                int slotX = recipeX() + slot * 34;
+                var shown = DiscoveryBook.displayStack(slots.get(slot));
                 graphics.blitSprite(RenderPipelines.GUI_TEXTURED, SLOT, slotX, y, 18, 18);
                 graphics.item(shown, slotX + 1, y + 1);
                 if (inside(mouseX, mouseY, slotX, y, 18, 18)) {
                     graphics.setTooltipForNextFrame(font, shown, mouseX, mouseY);
-                    if (discoveredOutput(ingredient) != null) graphics.requestCursor(CursorTypes.POINTING_HAND);
+                    if (discoveredOutput(slots.get(slot)) != null) graphics.requestCursor(CursorTypes.POINTING_HAND);
                 }
-                slotX += 34;
             }
             graphics.text(font, "+", recipeX() + 23, y + 5, FAINT, false);
-            if (personal) {
+            if (showingUses) graphics.text(font, "=", recipeX() + 57, y + 5, FAINT, false);
+            else if (personal) {
                 int shareX = recipeX() + 74;
                 boolean hovering = inside(mouseX, mouseY, shareX, y + 3, font.width("Share"), 12);
                 graphics.text(font, Component.literal("Share").withStyle(style -> style.withUnderlined(hovering)),
@@ -499,17 +577,62 @@ final class DiscoveryBookScreen extends Screen {
                 }
             }
         }
-        if (alternatives.size() > RECIPES) {
+        int listed = shownRecipes().size();
+        if (listed > RECIPES) {
             int trackX = detailTrackX();
             int trackY = detailTrackY();
-            int thumbHeight = detailThumbHeight(alternatives.size());
-            int thumbY = trackY + (detailTrackHeight() - thumbHeight) * detailScroll / (alternatives.size() - RECIPES);
+            int thumbHeight = detailThumbHeight(listed);
+            int thumbY = trackY + (detailTrackHeight() - thumbHeight) * detailScroll / (listed - RECIPES);
             boolean hovering = overDetailScrollbar(mouseX, mouseY);
             graphics.fill(trackX, trackY, trackX + 2, trackY + detailTrackHeight(), 0x20000000);
             graphics.fill(trackX, thumbY, trackX + 2, thumbY + thumbHeight, hovering ? HEADING : 0xFFB08A60);
             if (hovering) graphics.requestCursor(CursorTypes.POINTING_HAND);
         }
         if (!personal) drawDiscoverers(graphics, alternatives, x, mouseX, mouseY);
+    }
+
+    private int tabsX() {
+        return left + RIGHT_PAGE + PAGE_WIDTH / 2 - font.width(MADE + SEPARATOR + USED) / 2;
+    }
+
+    /** The closed tab under the mouse: false for Made from, true for Used in, null for neither. */
+    private Boolean hoveredTab(double mouseX, double mouseY) {
+        if (uses(selected).isEmpty()) return null;
+        int x = tabsX();
+        if (showingUses && inside(mouseX, mouseY, x, top + TABS_Y - 2, font.width(MADE), 12)) return false;
+        int usedX = x + font.width(MADE + SEPARATOR);
+        if (!showingUses && inside(mouseX, mouseY, usedX, top + TABS_Y - 2, font.width(USED), 12)) return true;
+        return null;
+    }
+
+    private void drawTabs(GuiGraphicsExtractor graphics, int recipeCount, int mouseX, int mouseY) {
+        int x = left + RIGHT_PAGE;
+        int center = x + PAGE_WIDTH / 2;
+        int useCount = uses(selected).size();
+        String label = useCount > 0 ? MADE + SEPARATOR + USED : recipeCount + (recipeCount == 1 ? " recipe" : " recipes");
+        int half = font.width(label) / 2 + 4;
+        graphics.fill(x + 4, top + TABS_Y + 4, center - half, top + TABS_Y + 5, 0x30000000);
+        graphics.fill(center + half, top + TABS_Y + 4, x + PAGE_WIDTH - 4, top + TABS_Y + 5, 0x30000000);
+        if (useCount == 0) {
+            graphics.text(font, label, center - font.width(label) / 2, top + TABS_Y, FAINT, false);
+            return;
+        }
+        var hovered = hoveredTab(mouseX, mouseY);
+        int tabX = tabsX();
+        tab(graphics, MADE, tabX, !showingUses, Boolean.FALSE.equals(hovered));
+        graphics.text(font, SEPARATOR, tabX + font.width(MADE), top + TABS_Y, FAINT, false);
+        tab(graphics, USED, tabX + font.width(MADE + SEPARATOR), showingUses, Boolean.TRUE.equals(hovered));
+        if (hovered != null) {
+            graphics.requestCursor(CursorTypes.POINTING_HAND);
+            graphics.setTooltipForNextFrame(font, Component.literal(hovered
+                    ? useCount + (useCount == 1 ? " recipe uses this" : " recipes use this")
+                    : recipeCount + (recipeCount == 1 ? " recipe makes this" : " recipes make this")), mouseX, mouseY);
+        }
+    }
+
+    private void tab(GuiGraphicsExtractor graphics, String label, int x, boolean open, boolean hovered) {
+        var text = Component.literal(label).withStyle(style -> style.withUnderlined(open || hovered));
+        graphics.text(font, text, x, top + TABS_Y, hovered ? HEADING : open ? INK : FAINT, false);
     }
 
     private void drawDiscoverers(GuiGraphicsExtractor graphics, List<DiscoveryCollection.Entry> alternatives,

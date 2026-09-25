@@ -96,6 +96,8 @@ The **Traits** settings tab lists every registered trait. Each toggle controls w
 
 Use ☆ / ★ in the Discovery Book to favorite an output or show only favorites. Favorites are personal, saved per world, and include every discovered recipe for the selected output. Both the modded screen and vanilla dialogs support them.
 
+With the mod installed on the client, the button beside the search field sorts the list by newest, oldest or name. When a selected output is also an ingredient, **Made from** and **Used in** switch the right page between the recipes that make it and the recipes that use it. Click any discovered item in a recipe to open it.
+
 Fusion Crafters default to **Repeat**. With the mod installed on the client, the crafter screen shows the current status (Ready, Fusing, Stopped or waiting for items) and has two buttons: the mode button switches between **Once** and **Repeat** without starting anything, and **Start**/**Stop** runs or stops the crafter. Stopping lets a fusion in progress finish. Without the client mod, `/fusion crafter` while looking at a crafter opens a dialog with the same controls; `/fusion crafter once|repeat|start|stop` and `/fusion crafter mode once|repeat` also work. Only its owner or the host can change its mode. Once mode pauses after one successful fusion, including after a world reload; **Start** or a redstone pulse runs another fusion. Redstone works like a lever: each pulse starts a stopped crafter or stops a running one, and a fusion in progress still finishes. Removing and replacing inputs does not bypass the pause.
 
 Provider outages, timeouts, access failures and rate limits display distinct messages and do not permanently block combinations. Only exhausted invalid generation blocks a combination.
