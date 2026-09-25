@@ -16,6 +16,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -102,7 +103,8 @@ public final class InfiniteCraftMod implements ModInitializer {
             } catch (Exception error) {
                 LOGGER.error("Configuration could not be applied; previous runtime retained", error);
                 for (var player : server.getPlayerList().getPlayers()) player.sendSystemMessage(
-                        Component.literal("Infinite Craft configuration rejected. Previous settings retained; see server log."), false);
+                        Component.literal("Infinite Craft configuration rejected. Previous settings retained; see server log.")
+                        .withStyle(ChatFormatting.RED), false);
             }
         });
     }
