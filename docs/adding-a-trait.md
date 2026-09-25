@@ -38,7 +38,7 @@ Implement [`TraitDefinition`](../src/main/java/dev/rocks/infinitecraft/traits/Tr
 | `components()` | Every component written, including helper writes. |
 | `apply(output, value)` | Apply the mapped native value to the output copy. |
 | `range()` | Optional strength range; omit for on/off abilities. |
-| `hint()` | Optional short hint, such as Edible or Wearable. |
+| `hint()` | Optional short hint with a leading icon, such as "🍎 Edible". Give each hint a unique icon and an RGB `hintColor()`. |
 | `supports(base)` | Reject incompatible item types. |
 | `conflicts()` | Trait IDs that cannot coexist. |
 | `validResult(result)` | Validate component combinations after application and inheritance. |

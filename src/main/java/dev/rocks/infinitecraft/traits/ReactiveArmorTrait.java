@@ -1,6 +1,5 @@
 package dev.rocks.infinitecraft.traits;
 
-import net.minecraft.ChatFormatting;
 import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.component.DataComponents;
@@ -14,7 +13,7 @@ import net.minecraft.world.item.equipment.Equippable;
 import java.util.Set;
 
 /** Rolled once per incoming hit, even when several equipped pieces share the trait. */
-record ReactiveArmorTrait(String id, String hint, ChatFormatting hintColor, String description,
+record ReactiveArmorTrait(String id, String hint, int hintColor, String description,
         Holder<MobEffect> effect, int duration, float chance, boolean retaliation) implements TraitDefinition {
     @Override public float triggerChance() { return chance; }
     @Override public Phase phase() { return Phase.EQUIPMENT; }

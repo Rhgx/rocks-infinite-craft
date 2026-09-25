@@ -1,6 +1,5 @@
 package dev.rocks.infinitecraft.traits;
 
-import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.ItemStack;
@@ -16,12 +15,12 @@ public final class BlockingTrait implements TraitDefinition {
 
     @Override
     public String hint() {
-        return "Protective";
+        return "🛡 Protective";
     }
 
     @Override
-    public ChatFormatting hintColor() {
-        return ChatFormatting.BLUE;
+    public int hintColor() {
+        return 0x5B7CFF;
     }
 
     @Override

@@ -10,6 +10,7 @@ import java.util.Set;
 public final class NibbleableTrait extends FoodTrait {
     @Override public String id() { return "nibbleable"; }
     @Override public String hint() { return "🍖 Nibbleable"; }
+    @Override public int hintColor() { return 0xD9A066; }
     @Override public String description() { return "Edible for 3 to 8 meals, spending one durability per meal."; }
     @Override public StrengthRange range() { return new StrengthRange(3, 8, 5); }
     @Override public Set<DataComponentType<?>> components() {
