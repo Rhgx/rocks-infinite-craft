@@ -60,6 +60,10 @@ public final class CatalogSearch {
         }
 
         public List<CatalogEntry> candidates(String first, String second, int limit, Set<String> allowedOutputs) {
+            return candidates(first, second, limit, allowedOutputs, 50);
+        }
+
+        public List<CatalogEntry> candidates(String first, String second, int limit, Set<String> allowedOutputs, int silliness) {
             if (limit <= 0 || entries.isEmpty()) return List.of();
             Set<String> firstTerms = byId.containsKey(first) ? byId.get(first).all : terms(first);
             Set<String> secondTerms = byId.containsKey(second) ? byId.get(second).all : terms(second);
@@ -92,7 +96,8 @@ public final class CatalogSearch {
             List<Ranked> pool = List.copyOf(shortlist.values());
             double[] similarity = new double[pool.size()];
             boolean[] selected = new boolean[pool.size()];
-            int exploration = noMatches ? count : count >= 4 ? Math.max(1, count / 4) : 0;
+            double explorationShare = .1 + .3 * Math.clamp(silliness, 0, 100) / 100.0;
+            int exploration = noMatches ? count : count >= 4 ? Math.max(1, (int) Math.round(count * explorationShare)) : 0;
             List<CatalogEntry> result = new ArrayList<>(count);
             // Lexical matching misses semantic connections, so the model also gets a small diverse sample.
             for (int slot = 0; slot < count; slot++) {

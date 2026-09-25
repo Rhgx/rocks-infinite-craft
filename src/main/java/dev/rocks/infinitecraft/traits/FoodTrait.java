@@ -60,7 +60,8 @@ public abstract class FoodTrait implements TraitDefinition {
         return !TraitComponents.changed(result, DataComponents.CONSUMABLE) || TraitComponents.supportsUse(result);
     }
 
-    protected abstract ConsumeEffect effect(double value);
+    /** Plain food traits can supply nutrition without an additional effect. */
+    protected ConsumeEffect effect(double value) { return null; }
 
     protected boolean replaces(ConsumeEffect effect) {
         return false;
@@ -72,7 +73,7 @@ public abstract class FoodTrait implements TraitDefinition {
         var effects = new ArrayList<ConsumeEffect>(existing == null ? List.of() : existing.onConsumeEffects());
         effects.removeIf(this::replaces);
         var effect = effect(value);
-        if (!effects.contains(effect)) {
+        if (effect != null && !effects.contains(effect)) {
             effects.add(effect);
         }
 

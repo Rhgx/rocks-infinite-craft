@@ -209,8 +209,14 @@ class RecipeEngineTest {
     @Test void invalidGenerationIsNotCachedAndMayBeRetried() throws Exception {
         AtomicInteger calls = new AtomicInteger();
         RecipeStore store = new RecipeStore(directory.resolve("recipes.json"));
-        try (RecipeEngine engine = new RecipeEngine(store, ignored -> calls.incrementAndGet() == 1
-                ? new RecipeResult("example:missing", 1) : STONE, 2)) {
+        try (RecipeEngine engine = new RecipeEngine(store, new dev.rocks.infinitecraft.core.RecipeGenerator() {
+            public RecipeResult generate(GenerationRequest request) { throw new AssertionError(); }
+            public List<RecipeResult> generateCandidates(GenerationRequest request, String feedback) {
+                int call = calls.incrementAndGet();
+                assertEquals(call == 1, feedback.isEmpty());
+                return List.of(call == 1 ? new RecipeResult("example:missing", 1) : STONE);
+            }
+        }, 2)) {
             GenerationRequest request = request("minecraft:a", "minecraft:b");
             assertEquals(STONE, engine.resolve(request, Map.of()).get(2, TimeUnit.SECONDS));
             assertEquals(2, calls.get());
@@ -350,7 +356,11 @@ class RecipeEngineTest {
             for (int attempt = 0; attempt < 4; attempt++) {
                 assertThrows(ExecutionException.class, () -> engine.resolve(request, Map.of()).get(2, TimeUnit.SECONDS));
                 assertTrue(store.get(PairKey.of(request.first(), request.second())).isEmpty());
+                if (attempt == 0) assertFalse(store.isBlocked(PairKey.of(request.first(), request.second())));
             }
         }
+        assertEquals("Provider limit reached. Try again later.", GenerationFailure.message(new IOException("Provider returned HTTP 429")));
+        assertEquals("No valid result. Combination blocked.", GenerationFailure.message(new BlockedRecipeException()));
+        assertFalse(GenerationFailure.message(new IOException("secret-provider-body")).contains("secret"));
     }
 }

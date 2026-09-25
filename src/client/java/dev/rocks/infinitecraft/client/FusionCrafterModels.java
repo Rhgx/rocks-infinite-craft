@@ -31,6 +31,7 @@ public final class FusionCrafterModels implements ClientModInitializer {
     public void onInitializeClient() {
         SpecialItemsTabClient.initialize();
         DiscoveryBookClient.initialize();
+        CrafterStateClient.initialize();
         ModelLoadingPlugin.register(plugin -> plugin.modifyBlockModelOnLoad().register((original, context) -> {
             if (!context.state().is(Blocks.CRAFTER)) return original;
             var orientation = context.state().getValue(BlockStateProperties.ORIENTATION);

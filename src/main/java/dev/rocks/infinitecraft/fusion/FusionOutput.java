@@ -1,12 +1,15 @@
 package dev.rocks.infinitecraft.fusion;
 
 import dev.rocks.infinitecraft.ModConfig;
+import dev.rocks.infinitecraft.core.PairKey;
 import dev.rocks.infinitecraft.core.RecipeResult;
 import dev.rocks.infinitecraft.item.FusionOrigin;
 import dev.rocks.infinitecraft.item.ItemDataFusion;
 import dev.rocks.infinitecraft.item.ItemTraits;
 import dev.rocks.infinitecraft.item.PotionFusion;
+import dev.rocks.infinitecraft.item.TraitLore;
 import dev.rocks.infinitecraft.item.VanillaTraits;
+import dev.rocks.infinitecraft.traits.LuckyBlockTrait;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
@@ -15,6 +18,9 @@ import net.minecraft.tags.ItemTags;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.DyedItemColor;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.function.Predicate;
 
@@ -48,10 +54,24 @@ final class FusionOutput {
         if (output.isEmpty() || !applyDye(output, result.dyeColor()) || !applyModel(output, result.itemModel())) {
             return ItemStack.EMPTY;
         }
-        if (!FusionCount.apply(output, first, second, special, config.specialCombinationLimit)) {
+        var chosen = new ArrayList<>(result.traits());
+        var inherited = new HashSet<>(ItemTraits.inherited(dataFirst, dataSecond));
+        inherited.addAll(chosen);
+        String pair = PairKey.of(BuiltInRegistries.ITEM.getKey(first.getItem()).toString(),
+                BuiltInRegistries.ITEM.getKey(second.getItem()).toString());
+        if (config.generatedTraits && !config.disabledTraits.contains(LuckyBlockTrait.ID)
+                && !inherited.contains(LuckyBlockTrait.ID) && inherited.size() < config.maxTraits
+                && LuckyBlockTrait.appears(pair, server.overworld().getSeed())) {
+            chosen.add(LuckyBlockTrait.ID);
+            if (!TraitLore.add(output, List.of(LuckyBlockTrait.ID))) return ItemStack.EMPTY;
+        }
+        ItemStack generated = output;
+        boolean lucky = inherited.contains(LuckyBlockTrait.ID) || chosen.contains(LuckyBlockTrait.ID);
+        if (!FusionCount.apply(output, first, second,
+                stack -> special.test(stack) || lucky && stack == generated, config.specialCombinationLimit)) {
             return ItemStack.EMPTY;
         }
-        if (!ItemTraits.apply(output, dataFirst, dataSecond, result.traits(), config.maxTraits)) return ItemStack.EMPTY;
+        if (!ItemTraits.apply(output, dataFirst, dataSecond, chosen, config.maxTraits)) return ItemStack.EMPTY;
         if (!FusionOrigin.apply(output, first, second)) return ItemStack.EMPTY;
         if (output.getCount() > output.getMaxStackSize()) return ItemStack.EMPTY;
         return ItemStack.validateStrict(output).result().orElse(ItemStack.EMPTY);

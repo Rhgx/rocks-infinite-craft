@@ -20,7 +20,7 @@ public final class ProviderConnectionTest {
         if (!RUNNING.compareAndSet(false, true))
             return CompletableFuture.completedFuture(new Result(false, "A connection test is already running. Wait for it to finish."));
         var result = new CompletableFuture<Result>();
-        Thread.ofVirtual().name("infinite-craft-connection-test").start(() -> {
+        Thread worker = Thread.ofVirtual().name("infinite-craft-connection-test").unstarted(() -> {
             Result outcome;
             try {
                 RecipeGenerators.create(config).generate(REQUEST);
@@ -32,6 +32,10 @@ public final class ProviderConnectionTest {
             }
             result.complete(outcome);
         });
+        result.whenComplete((ignored, error) -> {
+            if (result.isCancelled()) worker.interrupt();
+        });
+        worker.start();
         return result;
     }
 

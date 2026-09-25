@@ -156,7 +156,7 @@ class DiscoveryBookTest {
             assertEquals(state == dialog, top.getSiblings().get(0).getStyle().getClickEvent() != null);
             assertEquals(new net.minecraft.network.chat.ClickEvent.RunCommand("/fusion collection search"),
                     top.getSiblings().get(2).getStyle().getClickEvent());
-            assertEquals(state == firstPage, top.getSiblings().get(4).getStyle().getClickEvent() != null);
+            assertEquals(state == firstPage, top.getSiblings().getLast().getStyle().getClickEvent() != null);
         }
         assertTrue(((net.minecraft.server.dialog.body.PlainMessage) dialog.common().body().getFirst()).contents().getString().endsWith("Page 2 of 2"));
         assertEquals(2, dialog.common().body().stream().filter(ItemBody.class::isInstance).count());
@@ -173,7 +173,7 @@ class DiscoveryBookTest {
         }
         assertNull(labels.get(3).getStyle().getHoverEvent());
         assertFalse(preview.description().orElseThrow().contents().getString().contains("[Share]"));
-        assertNull(labels.getLast().getStyle().getClickEvent());
+        assertTrue(labels.getLast().getStyle().getClickEvent() instanceof net.minecraft.network.chat.ClickEvent.RunCommand);
         var encoded = Dialog.DIRECT_CODEC.encodeStart(lookup.createSerializationContext(JsonOps.INSTANCE), dialog);
         assertTrue(encoded.error().isEmpty(), () -> encoded.error().toString());
         var decoded = (net.minecraft.server.dialog.NoticeDialog) Dialog.DIRECT_CODEC.parse(
@@ -202,7 +202,8 @@ class DiscoveryBookTest {
         var personalText = ((ItemBody) personalDialog.common().body().get(2)).description().orElseThrow().contents();
         assertFalse(personalText.getString().contains("By "));
         assertFalse(personalText.getString().contains("OtherName"));
-        assertEquals(new net.minecraft.network.chat.ClickEvent.RunCommand("/fusion share 42"), personalText.getSiblings().getLast().getStyle().getClickEvent());
+        assertEquals(new net.minecraft.network.chat.ClickEvent.RunCommand("/fusion share 42"), personalText.getSiblings().stream()
+                .filter(part -> part.getString().equals("[Share]")).findFirst().orElseThrow().getStyle().getClickEvent());
         assertNull(personalText.getSiblings().getFirst().getStyle().getClickEvent());
         assertFalse(personalText.getString().contains("[+"));
         assertEquals("Close", DiscoveryBook.createDialog(List.of(personalEntry), 1, true, 42, 1).action().button().label().getString());
@@ -213,14 +214,15 @@ class DiscoveryBookTest {
         assertTrue(multiple.getString().contains("By "));
         assertTrue(multiple.getString().contains("OtherName"));
         assertTrue(multiple.getString().contains("Friend"));
-        assertTrue(multiple.getString().endsWith(" · [+1]"));
+        assertTrue(multiple.getString().contains(" · [+1]"));
+        var recipesLink = multiple.getSiblings().stream().filter(part -> part.getString().equals("[+1]")).findFirst().orElseThrow();
         assertEquals("Torch", multiple.getSiblings().getFirst().getString());
-        assertEquals(0x55FFFF, multiple.getSiblings().getLast().getStyle().getColor().getValue());
+        assertEquals(0x55FFFF, recipesLink.getStyle().getColor().getValue());
         assertNull(multiple.getSiblings().getFirst().getStyle().getClickEvent());
         assertInstanceOf(net.minecraft.network.chat.HoverEvent.ShowItem.class,
                 multiple.getSiblings().getFirst().getStyle().getHoverEvent());
         assertEquals(new net.minecraft.network.chat.ClickEvent.RunCommand("/fusion collection item 42 1 1"),
-                multiple.getSiblings().getLast().getStyle().getClickEvent());
+                recipesLink.getStyle().getClickEvent());
         assertEquals(1, DiscoveryBook.createDialog(recipes, 1).common().body().stream().filter(ItemBody.class::isInstance).count());
         var details = DiscoveryBook.createDialog(recipes, 1, true, 42, 2);
         assertEquals(2, details.common().body().stream().filter(ItemBody.class::isInstance).count());

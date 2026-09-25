@@ -17,6 +17,10 @@ public interface TraitDefinition {
 
     String id();
 
+    default String description() { return ""; }
+    /** Negative means this trait has no chance control. Otherwise use a probability from zero to one. */
+    default float triggerChance() { return -1; }
+
     default List<String> activationModes() {
         return List.of("auto");
     }

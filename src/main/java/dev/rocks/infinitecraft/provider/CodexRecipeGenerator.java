@@ -36,8 +36,13 @@ public final class CodexRecipeGenerator implements RecipeGenerator {
 
     @Override
     public List<RecipeResult> generateCandidates(GenerationRequest request) throws Exception {
+        return generateCandidates(request, "");
+    }
+
+    @Override
+    public List<RecipeResult> generateCandidates(GenerationRequest request, String feedback) throws Exception {
         byte[] prompt = ("Answer only from the supplied data. Do not use tools, read files, browse, or modify anything. "
-                + RecipePrompt.build(request, true)).getBytes(StandardCharsets.UTF_8);
+                + RecipePrompt.build(request, true, feedback)).getBytes(StandardCharsets.UTF_8);
         if (prompt.length > MAX_BYTES) throw new IOException("Codex request exceeds size limit");
         List<String> executable = command.isEmpty() ? List.of(findExecutable().toString()) : command;
         Path scratch = Files.createTempDirectory("infinitecraft-codex-");
@@ -126,6 +131,10 @@ public final class CodexRecipeGenerator implements RecipeGenerator {
         if (request.supportedTraits().isEmpty()) return schema;
         var recipe = schema.getAsJsonObject("properties").getAsJsonObject("results").getAsJsonObject("items");
         var properties = recipe.getAsJsonObject("properties");
+        for (var style : List.of(properties.getAsJsonObject("nameStyle"), properties.getAsJsonObject("nameParts")
+                .getAsJsonObject("items").getAsJsonObject("properties").getAsJsonObject("style"))) {
+            style.add("required", JSON.toJsonTree(style.getAsJsonObject("properties").keySet()));
+        }
         // Required arrays stay sparse even when the catalog supports many traits.
         recipe.add("required", JSON.toJsonTree(List.of("itemId", "count", "name", "traits", "strengths", "activations", "nameStyle", "dyeColor", "itemModel", "nameParts")));
         if (properties.has("potion")) recipe.getAsJsonArray("required").add("potion");

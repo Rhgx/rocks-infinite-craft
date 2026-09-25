@@ -9,6 +9,6 @@ public final class DiscoveryBookClient {
 
     public static void initialize() {
         ClientPlayNetworking.registerGlobalReceiver(DiscoveryScreenPayload.TYPE, (payload, context) ->
-                context.client().setScreenAndShow(new DiscoveryBookScreen(payload.entries(), payload.personal())));
+                context.client().setScreenAndShow(new DiscoveryBookScreen(payload.entries(), payload.personal(), payload.favorites())));
     }
 }

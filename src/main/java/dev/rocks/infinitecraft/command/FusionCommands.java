@@ -47,6 +47,9 @@ public final class FusionCommands {
         dispatcher.register(literal("fusion")
                 .executes(context -> status(context.getSource()))
                 .then(recipeCommands())
+                .then(TraitTestCommand.create())
+                .then(CrafterCommand.create())
+                .then(favoriteCommand())
                 .then(shareCommand())
                 .then(bookCommand())
                 .then(collectionCommand())
@@ -70,6 +73,8 @@ public final class FusionCommands {
 
     private static LiteralArgumentBuilder<CommandSourceStack> collectionCommand() {
         return literal("collection")
+                .then(literal("favorites").executes(context -> favoritePage(context, 1))
+                        .then(pageArgument("page", FusionCommands::favoritePage)))
                 .executes(context -> collection(context, 1))
                 .then(literal("search").executes(FusionCommands::openSearch))
                 .then(literal("query")
@@ -85,6 +90,32 @@ public final class FusionCommands {
                                                 page(context, "returnPage")))))))
                 .then(literal("close").executes(FusionCommands::closeCollection))
                 .then(pageArgument("page", (context, page) -> collection(context, page)));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> favoriteCommand() {
+        var id = argument("discovery", IntegerArgumentType.integer(1))
+                .executes(context -> toggleFavorite(context, false, 0));
+        id.then(literal("page").then(pageArgument("page", (context, page) -> toggleFavorite(context, false, page))));
+        id.then(literal("favorites").then(pageArgument("page", (context, page) -> toggleFavorite(context, true, page))));
+        return literal("favorite").then(id);
+    }
+
+    private static int toggleFavorite(CommandContext<CommandSourceStack> context, boolean favoritesOnly, int page) throws CommandSyntaxException {
+        var player = context.getSource().getPlayerOrException();
+        if (runtime() == null || !canOpenCollection(player)
+                || !runtime().toggleFavorite(player, IntegerArgumentType.getInteger(context, "discovery"))) return 0;
+        if (page > 0) return favoritesOnly ? favoritePage(context, page) : collection(context, page);
+        return 1;
+    }
+
+    private static int favoritePage(CommandContext<CommandSourceStack> context, int page) throws CommandSyntaxException {
+        var player = context.getSource().getPlayerOrException();
+        if (runtime() == null || !canOpenCollection(player)) return 0;
+        player.openDialog(Holder.direct(dev.rocks.infinitecraft.discovery.DiscoveryDialogs.createDialog(
+                runtime().discoveries(player), page, runtime().personalBook(), 0, 1,
+                "/fusion collection favorites ", runtime().favoriteIds(player), true)));
+        playBookClick(player);
+        return 1;
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> catalogCommand() {
@@ -204,8 +235,8 @@ public final class FusionCommands {
             if (selected.isEmpty() || entries.stream().filter(entry -> ItemStack.isSameItemSameComponents(
                     entry.result(), selected.orElseThrow().result())).count() < 2) return 0;
         }
-        player.openDialog(Holder.direct(DiscoveryBook.createDialog(
-                entries, page, InfiniteCraftMod.personalBook(), itemId, returnPage)));
+        player.openDialog(Holder.direct(dev.rocks.infinitecraft.discovery.DiscoveryDialogs.createDialog(
+                entries, page, InfiniteCraftMod.personalBook(), itemId, returnPage, null, runtime().favoriteIds(player), false)));
         // Send only to the reader so browsing never makes sounds for nearby players.
         if (context.getNodes().stream().noneMatch(node -> node.getNode().getName().equals("back"))) playBookClick(player);
         return 1;
@@ -242,8 +273,8 @@ public final class FusionCommands {
         if (!canOpenCollection(player)) return 0;
         String query = discoverySearches.getOrDefault(player.getUUID(), "");
         var entries = DiscoveryBook.search(runtime().discoveries(player), query);
-        player.openDialog(Holder.direct(DiscoveryBook.createDialog(entries, page,
-                InfiniteCraftMod.personalBook(), 0, 1, "/fusion collection results ")));
+        player.openDialog(Holder.direct(dev.rocks.infinitecraft.discovery.DiscoveryDialogs.createDialog(entries, page,
+                InfiniteCraftMod.personalBook(), 0, 1, "/fusion collection results ", runtime().favoriteIds(player), false)));
         if (playSound) playBookClick(player);
         return 1;
     }

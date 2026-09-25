@@ -19,3 +19,15 @@ Before a release, check in-game:
 7. Craft a Fusion Crafter with an Amethyst Shard and Copper Ingot. Try two slots, identical inputs, stacks, removing an input during generation, and a failed combination. Break and replace it, then reopen the world. Check both fusion toggles and the appearance with and without the optional pack.
 
 Close Minecraft before replacing its loaded mod JAR.
+
+## Trait test items
+
+The host can create test items without calling a model or adding discoveries:
+
+```mcfunction
+/fusion test minecraft:diamond_sword explosive vampiric
+/fusion test minecraft:iron_chestplate hardened startled
+/fusion test minecraft:apple nibbleable hearty_food
+```
+
+Use spaces or commas between trait IDs. Incompatible combinations are rejected; existing held items are untouched. The command uses each trait's default strength and the host's chance settings.

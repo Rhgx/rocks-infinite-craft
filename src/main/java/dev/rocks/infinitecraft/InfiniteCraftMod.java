@@ -4,6 +4,7 @@ import dev.rocks.infinitecraft.command.FusionCommands;
 import dev.rocks.infinitecraft.discovery.DiscoveryBook;
 import dev.rocks.infinitecraft.discovery.DiscoveryScreenPayload;
 import dev.rocks.infinitecraft.discovery.SpecialItemsTab;
+import dev.rocks.infinitecraft.fusion.CrafterStatePayload;
 import dev.rocks.infinitecraft.fusion.FusionCrafterBlock;
 import dev.rocks.infinitecraft.fusion.FusionRuntime;
 import dev.rocks.infinitecraft.traits.CombatTraits;
@@ -46,6 +47,10 @@ public final class InfiniteCraftMod implements ModInitializer {
         return runtime == null ? ItemStack.EMPTY : runtime.crafterPreview(block);
     }
 
+    public static boolean crafterWorking(CrafterBlockEntity block) {
+        return runtime != null && runtime.crafterWorking(block);
+    }
+
     public static void crafterChanged(BlockEntity block) {
         if (runtime != null && block.getLevel() instanceof ServerLevel
                 && block instanceof CrafterBlockEntity crafter && FusionCrafterBlock.marked(crafter))
@@ -56,6 +61,13 @@ public final class InfiniteCraftMod implements ModInitializer {
             LivingEntity placer) {
         if (placer instanceof ServerPlayer player && FusionCrafterBlock.marked(block))
             FusionCrafterBlock.setOwner(block, player.getUUID());
+    }
+
+    /** Redstone pulses act like a lever: start a stopped crafter, stop a running one. */
+    public static void pulseCrafter(CrafterBlockEntity block) {
+        if (!FusionCrafterBlock.marked(block)) return;
+        if (FusionCrafterBlock.paused(block)) triggerCrafter(block);
+        else FusionCrafterBlock.setMode(block, FusionCrafterBlock.repeats(block), true);
     }
 
     public static void triggerCrafter(CrafterBlockEntity block) {
@@ -96,8 +108,10 @@ public final class InfiniteCraftMod implements ModInitializer {
     @Override
     public void onInitialize() {
         CombatTraits.initialize();
+        dev.rocks.infinitecraft.traits.LuckyBlockTrait.initialize();
         SpecialItemsTab.initialize();
         DiscoveryScreenPayload.initialize();
+        CrafterStatePayload.initialize();
         net.fabricmc.fabric.api.event.lifecycle.v1.ServerBlockEntityEvents.BLOCK_ENTITY_LOAD.register((block, world) -> {
             if (block instanceof CrafterBlockEntity crafter) {
                 // Components may not be loaded yet; the runtime checks the marker at the next server tick.

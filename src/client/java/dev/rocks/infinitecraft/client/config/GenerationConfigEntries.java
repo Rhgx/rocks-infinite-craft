@@ -58,8 +58,11 @@ final class GenerationConfigEntries {
         var key = new SecretEntry(config.provider.apiKey());
         var keyEnv = entries.startStrField(Component.literal("API key variable"), config.provider.apiKeyEnv()).setDefaultValue("")
                 .setTooltip(Component.literal("Used when the API key is empty.")).build();
-        var timeout = entries.startIntField(Component.literal("Timeout, seconds"), config.provider.timeoutSeconds())
-                .setDefaultValue(60).setMin(1).setMax(300).build();
+        var timeout = entries.startIntSlider(Component.literal("Request timeout"), config.provider.timeoutSeconds(), 1, 300)
+                .setDefaultValue(60)
+                .setTooltip(Component.literal("How long to wait for the provider before giving up."))
+                .setTextGetter(value -> Component.literal(value + " s"))
+                .build();
         Supplier<ProviderConfig> providerValue = () -> {
             Provider selected = provider.getValue();
             if (selected == null) throw new IllegalArgumentException("Choose a provider.");
@@ -89,6 +92,7 @@ final class GenerationConfigEntries {
         var connectionHeader = entries.startTextDescription(
                 Component.literal("Connection").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD)).build();
         connectionHeader.setDisplayRequirement(http::get);
+        fields.section(ai, "Provider", "New recipes are written by an AI model. Known recipes work without one.");
         ai.addEntry(generation);
         ai.addEntry(provider);
         fields.section(ai, "Model");
@@ -102,29 +106,32 @@ final class GenerationConfigEntries {
         connectionTest.setDisplayRequirement(() -> provider.getValue() != Provider.DISABLED);
         ai.addEntry(connectionTest);
 
-        fields.section(limits, "Requests");
+        fields.section(limits, "Requests", "Only change these if generation is slow or failing.");
         limits.addEntry(timeout);
-        fields.integer(limits, "Generation attempts", config.generationAttempts, 3, 1, 4,
+        fields.slider(limits, "Attempts per recipe", config.generationAttempts, 3, 1, 4,
+                "Tries per recipe before the fusion fails.", ConfigEntries::number,
                 value -> config.generationAttempts = value);
-        fields.integer(limits, "Generation threads", config.generationThreads, 1, 1, 8,
-                "Recipes that may generate at the same time.", value -> config.generationThreads = value);
+        fields.slider(limits, "Parallel requests", config.generationThreads, 1, 1, 8,
+                "Recipes that may generate at the same time.", ConfigEntries::number,
+                value -> config.generationThreads = value);
         var endpointHeader = entries.startTextDescription(
                 Component.literal("Connection overrides").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD)).build();
         endpointHeader.setDisplayRequirement(http::get);
         limits.addEntry(endpointHeader);
         limits.addEntry(baseUrl);
         limits.addEntry(keyEnv);
-        fields.section(limits, "Scanning");
-        fields.integer(limits, "Scan interval, ticks", config.scanIntervalTicks, 10, 1, 200,
+        fields.section(limits, "Performance", "Lower these on busy servers.");
+        fields.slider(limits, "Scan interval", config.scanIntervalTicks, 10, 1, 200,
+                "How often dropped items are checked for fusion.", ConfigEntries::seconds,
                 value -> config.scanIntervalTicks = value);
         fields.integer(limits, "Nearby item limit", config.maxNearbyItems, 64, 2, 256,
-                value -> config.maxNearbyItems = value);
-        fields.integer(limits, "Pending exchange limit", config.maxPending, 8, 1, 64,
-                value -> config.maxPending = value);
+                "Areas with more dropped items than this are skipped.", value -> config.maxNearbyItems = value);
+        fields.integer(limits, "Pending fusion limit", config.maxPending, 8, 1, 64,
+                "Fusions that can wait on generation at once, across all players.", value -> config.maxPending = value);
         fields.integer(limits, "Candidate count", config.candidateLimit, 48, 1, 256,
-                value -> config.candidateLimit = value);
-        fields.integer(limits, "Cooldown, ticks", config.cooldownTicks, 100, 20, 12000,
-                value -> config.cooldownTicks = value);
+                "Possible result items offered to the model per request.", value -> config.candidateLimit = value);
+        fields.integer(limits, "Item cooldown, ticks", config.cooldownTicks, 100, 20, 12000,
+                "How long dropped items wait after a fusion attempt before fusing again. 20 ticks is one second.", value -> config.cooldownTicks = value);
 
         return providerValue;
     }

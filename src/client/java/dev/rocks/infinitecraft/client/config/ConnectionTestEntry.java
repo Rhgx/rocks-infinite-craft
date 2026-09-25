@@ -16,6 +16,7 @@ import net.minecraft.util.Util;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
@@ -27,6 +28,8 @@ final class ConnectionTestEntry extends AbstractConfigListEntry<Boolean> {
     private int statusColor = 0xFFAAAAAA;
     private Identifier icon = Identifier.withDefaultNamespace("icon/ping_unknown");
     private boolean running;
+    private long started;
+    private CompletableFuture<ProviderConnectionTest.Result> pending;
 
     ConnectionTestEntry(Supplier<ProviderConfig> currentSettings) {
         super(Component.literal("Test connection"), false);
@@ -37,7 +40,10 @@ final class ConnectionTestEntry extends AbstractConfigListEntry<Boolean> {
     }
 
     private void test(Supplier<ProviderConfig> currentSettings) {
-        if (running) return;
+        if (running) {
+            pending.cancel(true);
+            return;
+        }
         ProviderConfig config;
         try {
             config = currentSettings.get();
@@ -46,15 +52,18 @@ final class ConnectionTestEntry extends AbstractConfigListEntry<Boolean> {
             return;
         }
         running = true;
-        button.active = false;
-        button.setMessage(Component.literal("Testing..."));
+        started = Util.getMillis();
+        button.setMessage(Component.literal("Cancel"));
+        button.setTooltip(Tooltip.create(Component.literal("Cancel the connection test.")));
         status = "Testing...";
         statusColor = 0xFFFFCC66;
 
-        ProviderConnectionTest.start(config).thenAccept(result -> Minecraft.getInstance().execute(() -> {
+        pending = ProviderConnectionTest.start(config);
+        pending.whenComplete((result, error) -> Minecraft.getInstance().execute(() -> {
             running = false;
             button.setMessage(Component.literal("Test connection"));
-            setStatus(result.success() ? "Connected" : "Test failed", result.message(), result.success());
+            if (error != null) setStatus("Cancelled", "Test cancelled.", false);
+            else setStatus(result.success() ? "Connected" : "Test failed", result.message(), result.success());
         }));
     }
 
@@ -101,11 +110,12 @@ final class ConnectionTestEntry extends AbstractConfigListEntry<Boolean> {
         int frame = (int) (Util.getMillis() / 100L & 7L);
         var statusIcon = running ? PINGING.get(frame > 4 ? 8 - frame : frame) : icon;
         graphics.blitSprite(RenderPipelines.GUI_TEXTURED, statusIcon, x + 3, y + 6, 10, 8);
-        String visibleStatus = font.plainSubstrByWidth(status, Math.max(0, width - button.getWidth() - 30));
+        String label = running ? "Testing... " + (Util.getMillis() - started) / 1000 + "s" : status;
+        String visibleStatus = font.plainSubstrByWidth(label, Math.max(0, width - button.getWidth() - 30));
         graphics.text(font, Component.literal(visibleStatus), x + 22, y + 6, statusColor);
         button.setX(x + width - button.getWidth());
         button.setY(y);
-        button.active = !running && isEditable();
+        button.active = isEditable();
         button.extractRenderState(graphics, mouseX, mouseY, delta);
     }
 }

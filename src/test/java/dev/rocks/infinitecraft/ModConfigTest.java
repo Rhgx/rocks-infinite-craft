@@ -65,8 +65,12 @@ class ModConfigTest {
         config.power = 90;
         config.silliness = 10;
         config.allowModdedItems = false;
+        config.disabledTraits = java.util.Set.of("explosive");
+        config.traitChances = java.util.Map.of("hardened", 40);
         config.save(file);
         ModConfig loaded = ModConfig.load(file);
+        assertEquals(config.disabledTraits, loaded.disabledTraits);
+        assertEquals(config.traitChances, loaded.traitChances);
         assertEquals("test-secret", loaded.provider.apiKey());
         assertTrue(loaded.generationEnabled);
         assertTrue(loaded.combineSpecialItems);
@@ -119,6 +123,7 @@ class ModConfigTest {
     @Test void rejectsInvalidConfigWithoutOverwriting() throws Exception {
         Path file = directory.resolve("infinitecraft.json");
         for (String invalid : new String[]{"null", "{\"maxPending\":0}", "{\"provider\":null}", "{\"specialResultChance\":-1}", "{\"specialResultChance\":101}",
+                "{\"traitChances\":{\"hardened\":101}}", "{\"disabledTraits\":null}",
                 "{\"provider\":{\"provider\":\"openai\",\"model\":\"\",\"timeoutSeconds\":60}}"}) {
             Files.writeString(file, invalid);
             assertThrows(IOException.class, () -> ModConfig.load(file));

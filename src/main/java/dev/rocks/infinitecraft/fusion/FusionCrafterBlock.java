@@ -19,6 +19,8 @@ import java.util.UUID;
 public final class FusionCrafterBlock {
     public static final String MARKER = "rocks_fusion_crafter";
     public static final String OWNER = "rocks_fusion_owner";
+    private static final String REPEAT = "rocks_fusion_repeat";
+    private static final String PAUSED = "rocks_fusion_paused";
     private static final CompoundTag MARKER_PATTERN = markerTag();
 
     private FusionCrafterBlock() {
@@ -53,6 +55,23 @@ public final class FusionCrafterBlock {
 
     public static boolean inputSlot(int slot) {
         return slot == 3 || slot == 5;
+    }
+
+    public static boolean repeats(CrafterBlockEntity block) {
+        return block.components().getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag().getBooleanOr(REPEAT, true);
+    }
+
+    public static boolean paused(CrafterBlockEntity block) {
+        return block.components().getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag().getBooleanOr(PAUSED, false);
+    }
+
+    public static void setMode(CrafterBlockEntity block, boolean repeat, boolean paused) {
+        var data = block.components().getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+        data.putBoolean(REPEAT, repeat);
+        data.putBoolean(PAUSED, paused);
+        block.setComponents(DataComponentMap.builder().addAll(block.components())
+                .set(DataComponents.CUSTOM_DATA, CustomData.of(data)).build());
+        block.setChanged();
     }
 
     public static ItemStack item() {

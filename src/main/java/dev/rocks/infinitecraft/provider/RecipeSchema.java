@@ -36,7 +36,8 @@ final class RecipeSchema {
                     strengthProperties.put(trait, Map.of("type", "number", "minimum", 0, "maximum", 1)));
             var activationProperties = new LinkedHashMap<String, Object>();
             request.supportedTraits().forEach(id -> activationProperties.put(id, Map.of("type", "string", "enum",
-                    TraitRegistry.get(id).activationModes())));
+                    TraitRegistry.get(id).activationModes().stream()
+                            .filter(mode -> !mode.equals("consumed_intense") || request.rarityQuality() >= 75).toList())));
             properties.put("activations", Map.of("type", "object", "additionalProperties", false,
                     "properties", activationProperties, "maxProperties", request.maxTraits()));
             var styleProperties = new LinkedHashMap<String, Object>();
@@ -45,7 +46,7 @@ final class RecipeSchema {
             for (String flag : List.of("bold", "italic", "underlined", "strikethrough", "obfuscated"))
                 styleProperties.put(flag, Map.of("type", "boolean"));
             var styleSchema = Map.of("type", "object", "additionalProperties", false,
-                    "required", List.copyOf(styleProperties.keySet()), "properties", styleProperties);
+                    "properties", styleProperties);
             properties.put("nameStyle", styleSchema);
             properties.put("nameParts", Map.of("type", "array", "maxItems", 8, "items",
                     Map.of("type", "object", "additionalProperties", false, "required", List.of("text", "style"),

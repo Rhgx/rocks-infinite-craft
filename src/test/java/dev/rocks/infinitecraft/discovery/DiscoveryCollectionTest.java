@@ -23,6 +23,25 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class DiscoveryCollectionTest {
+    @Test void favoritesArePrivatePersistentAndIncludeAlternateRecipes() throws Exception {
+        var file = directory.resolve("favorites.json");
+        var collection = new DiscoveryCollection(file, lookup);
+        var owner = java.util.UUID.randomUUID();
+        var other = java.util.UUID.randomUUID();
+        var output = new ItemStack(Items.TORCH);
+        collection.record(new ItemStack(Items.STICK), new ItemStack(Items.COAL), output, "Rocks", owner);
+        collection.toggleFavorite(1, owner);
+        collection.record(new ItemStack(Items.STICK), new ItemStack(Items.CHARCOAL), output, "Friend", other);
+        assertEquals(java.util.Set.of(1, 2), collection.favoriteIds(owner));
+        assertTrue(collection.favoriteIds(other).isEmpty());
+        collection.save(collection.snapshot());
+        collection = new DiscoveryCollection(file, lookup);
+        assertEquals(java.util.Set.of(1, 2), collection.favoriteIds(owner));
+        collection.toggleFavorite(2, owner);
+        assertTrue(collection.favoriteIds(owner).isEmpty());
+        collection.save(collection.snapshot());
+        assertTrue(new DiscoveryCollection(file, lookup).favoriteIds(owner).isEmpty());
+    }
     private static HolderLookup.Provider lookup;
     @TempDir Path directory;
     @BeforeAll static void bootstrap() {
