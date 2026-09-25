@@ -139,8 +139,6 @@ public final class DiscoveryCollection {
         return true;
     }
 
-
-
     public List<Entry> entries() {
         return snapshot(entries);
     }

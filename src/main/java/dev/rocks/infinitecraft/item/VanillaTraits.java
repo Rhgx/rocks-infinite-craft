@@ -1,5 +1,6 @@
 package dev.rocks.infinitecraft.item;
 
+import dev.rocks.infinitecraft.core.NamePart;
 import dev.rocks.infinitecraft.core.NameStyle;
 import dev.rocks.infinitecraft.core.TraitStrengths;
 import dev.rocks.infinitecraft.traits.TraitDefinition;
@@ -37,7 +38,7 @@ public final class VanillaTraits {
     }
 
     public static ItemStack apply(ItemStack base, List<String> traits, String name, Map<String, Double> strengths,
-            Map<String, String> activations, NameStyle nameStyle, List<dev.rocks.infinitecraft.core.NamePart> nameParts) {
+            Map<String, String> activations, NameStyle nameStyle, List<NamePart> nameParts) {
         if (activations == null || nameStyle == null) return ItemStack.EMPTY;
         if (base == null || base.isEmpty() || traits == null || strengths == null || traits.size() > 8
                 || new HashSet<>(traits).size() != traits.size()

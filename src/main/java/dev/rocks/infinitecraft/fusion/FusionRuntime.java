@@ -18,6 +18,7 @@ import dev.rocks.infinitecraft.discovery.DiscoveryBook;
 import dev.rocks.infinitecraft.discovery.DiscoveryCollection;
 import dev.rocks.infinitecraft.discovery.SpecialItemsTab;
 import dev.rocks.infinitecraft.engine.BlockedRecipeException;
+import dev.rocks.infinitecraft.engine.GenerationFailure;
 import dev.rocks.infinitecraft.engine.RecipeEngine;
 import dev.rocks.infinitecraft.engine.RecipeStore;
 import dev.rocks.infinitecraft.item.ComponentPairKey;
@@ -510,7 +511,7 @@ public final class FusionRuntime implements AutoCloseable {
                         // Provider bodies and credentials are never echoed into chat or logs.
                         Throwable cause = error;
                         while (cause instanceof CompletionException && cause.getCause() != null) cause = cause.getCause();
-                        deny(world, player, a, b, dev.rocks.infinitecraft.engine.GenerationFailure.message(cause));
+                        deny(world, player, a, b, GenerationFailure.message(cause));
                         InfiniteCraftMod.LOGGER.warn("Fusion request {} failed: {}", token, cause.getMessage());
                         return;
                     }

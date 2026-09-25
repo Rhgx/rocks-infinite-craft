@@ -18,7 +18,10 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -26,17 +29,17 @@ class DiscoveryCollectionTest {
     @Test void favoritesArePrivatePersistentAndIncludeAlternateRecipes() throws Exception {
         var file = directory.resolve("favorites.json");
         var collection = new DiscoveryCollection(file, lookup);
-        var owner = java.util.UUID.randomUUID();
-        var other = java.util.UUID.randomUUID();
+        var owner = UUID.randomUUID();
+        var other = UUID.randomUUID();
         var output = new ItemStack(Items.TORCH);
         collection.record(new ItemStack(Items.STICK), new ItemStack(Items.COAL), output, "Rocks", owner);
         collection.toggleFavorite(1, owner);
         collection.record(new ItemStack(Items.STICK), new ItemStack(Items.CHARCOAL), output, "Friend", other);
-        assertEquals(java.util.Set.of(1, 2), collection.favoriteIds(owner));
+        assertEquals(Set.of(1, 2), collection.favoriteIds(owner));
         assertTrue(collection.favoriteIds(other).isEmpty());
         collection.save(collection.snapshot());
         collection = new DiscoveryCollection(file, lookup);
-        assertEquals(java.util.Set.of(1, 2), collection.favoriteIds(owner));
+        assertEquals(Set.of(1, 2), collection.favoriteIds(owner));
         collection.toggleFavorite(2, owner);
         assertTrue(collection.favoriteIds(owner).isEmpty());
         collection.save(collection.snapshot());
@@ -70,7 +73,7 @@ class DiscoveryCollectionTest {
         var collection = new DiscoveryCollection(file, lookup);
         var first = new ItemStack(Items.STICK);
         var second = new ItemStack(Items.COAL);
-        var output = VanillaTraits.apply(new ItemStack(Items.JUNGLE_PLANKS), java.util.List.of("bouncy"), "Spring Planks");
+        var output = VanillaTraits.apply(new ItemStack(Items.JUNGLE_PLANKS), List.of("bouncy"), "Spring Planks");
         var ordinary = DiscoveryAnnouncements.discoveryMessage(new ItemStack(Items.STONE), "Rocks");
         assertTrue(ordinary.getString().startsWith("[FIRST] Rocks found "));
         assertTrue(ordinary.getSiblings().getFirst().getStyle().isBold());
@@ -100,14 +103,14 @@ class DiscoveryCollectionTest {
         assertEquals(1, saveSnapshot.size());
         assertThrows(UnsupportedOperationException.class, () -> pageSnapshot.clear());
         assertEquals("Spring Planks", collection.entries().getFirst().result().getHoverName().getString());
-        var rocks = java.util.UUID.randomUUID();
-        var friend = java.util.UUID.randomUUID();
+        var rocks = UUID.randomUUID();
+        var friend = UUID.randomUUID();
         assertFalse(reloaded.record(first, second, pageSnapshot.getFirst().result(), "Rocks", rocks));
         assertEquals(1, reloaded.entries(rocks, "Rocks").size());
         assertFalse(reloaded.record(first, second, pageSnapshot.getFirst().result(), "Friend", friend));
         assertEquals(List.of("Rocks", "Friend"), reloaded.entries().getFirst().discoverers());
         assertEquals(2, reloaded.entries(friend, "Friend").size());
-        assertEquals(0, reloaded.entries(java.util.UUID.randomUUID(), "Stranger").size());
+        assertEquals(0, reloaded.entries(UUID.randomUUID(), "Stranger").size());
         reloaded.save(reloaded.snapshot());
         var personalReload = new DiscoveryCollection(file, lookup);
         assertTrue(personalReload.owns(1, friend, "RenamedFriend"));
@@ -161,7 +164,7 @@ class DiscoveryCollectionTest {
     @Test void queuedSavesCoalesceAndKeepTheLatestSnapshot() throws Exception {
         var file = directory.resolve("coalesced.json");
         var collection = new DiscoveryCollection(file, lookup);
-        var jobs = new java.util.ArrayDeque<Runnable>();
+        var jobs = new ArrayDeque<Runnable>();
         for (int i = 0; i < 100; i++) {
             var output = new ItemStack(Items.STONE);
             output.set(DataComponents.CUSTOM_NAME, Component.literal("Result " + i));

@@ -1,6 +1,7 @@
 package dev.rocks.infinitecraft.item;
 
 import dev.rocks.infinitecraft.fusion.FusionCount;
+import dev.rocks.infinitecraft.traits.TraitComponents;
 import dev.rocks.infinitecraft.traits.TraitRegistry;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.component.DataComponents;
@@ -182,7 +183,7 @@ public final class ItemDataFusion {
                     var targetEquipment = result.get(DataComponents.EQUIPPABLE);
                     if (targetEquipment != null && targetEquipment.slot() != sourceEquipment.slot()) return false;
                     if (targetEquipment == null) {
-                        if (!dev.rocks.infinitecraft.traits.TraitComponents.supportsUse(result)) return false;
+                        if (!TraitComponents.supportsUse(result)) return false;
                         result.set(DataComponents.EQUIPPABLE, sourceEquipment);
                     }
                 }

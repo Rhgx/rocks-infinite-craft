@@ -17,6 +17,10 @@ import net.minecraft.world.item.enchantment.*;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class ItemDataFusionTest {
@@ -55,12 +59,12 @@ class ItemDataFusionTest {
         special.set(DataComponents.CUSTOM_NAME, Component.literal("Special"));
         assertTrue(FusionCount.apply(special, plain, plain));
         assertEquals(0, FusionCount.get(special));
-        assertTrue(ItemTraits.apply(special, plain, plain, java.util.List.of("bouncy"), 1));
-        assertEquals(java.util.List.of("bouncy"), ItemTraits.inherited(special));
+        assertTrue(ItemTraits.apply(special, plain, plain, List.of("bouncy"), 1));
+        assertEquals(List.of("bouncy"), ItemTraits.inherited(special));
         assertEquals(0, FusionCount.get(special));
         var retuned = special.copy();
-        assertTrue(ItemTraits.apply(retuned, special, plain, java.util.List.of("bouncy"), 1));
-        assertFalse(ItemTraits.apply(retuned, special, plain, java.util.List.of("speedy"), 1));
+        assertTrue(ItemTraits.apply(retuned, special, plain, List.of("bouncy"), 1));
+        assertFalse(ItemTraits.apply(retuned, special, plain, List.of("speedy"), 1));
         assertTrue(FusionCount.supportedData(retuned));
         var dyed = new ItemStack(Items.LEATHER_CHESTPLATE);
         dyed.set(DataComponents.DYED_COLOR, new net.minecraft.world.item.component.DyedItemColor(0x4A8BFF));
@@ -87,7 +91,7 @@ class ItemDataFusionTest {
         var strippedChestBoat = FusionOrigin.strip(chestBoat);
         assertTrue(ItemDataFusion.supported(strippedChestBoat));
         assertTrue(strippedChestBoat.getComponentsPatch().isEmpty());
-        var lineage = new java.util.ArrayList<ItemStack>();
+        var lineage = new ArrayList<ItemStack>();
         var descendant = special;
         for (int count = 1; count <= 5; count++) {
             var next = new ItemStack(Items.STONE);
@@ -232,7 +236,7 @@ class ItemDataFusionTest {
     @Test void stewCarriesPotionLevelsAndItsOwnEffectsAcrossFurtherFusion() {
         var stew = new ItemStack(Items.SUSPICIOUS_STEW);
         stew.set(DataComponents.SUSPICIOUS_STEW_EFFECTS, new net.minecraft.world.item.component.SuspiciousStewEffects(
-                java.util.List.of(new net.minecraft.world.item.component.SuspiciousStewEffects.Entry(
+                List.of(new net.minecraft.world.item.component.SuspiciousStewEffects.Entry(
                         net.minecraft.world.effect.MobEffects.BLINDNESS, 160))));
         assertTrue(ItemDataFusion.supported(stew));
         assertTrue(ItemDataFusion.specialIngredient(stew));
@@ -265,9 +269,9 @@ class ItemDataFusionTest {
         var result = ItemDataFusion.prepare(brewed, healing, glowstone, true);
         assertTrue(result.get(DataComponents.POTION_CONTENTS).is(Potions.STRONG_HEALING));
         assertTrue(healing.get(DataComponents.POTION_CONTENTS).is(Potions.HEALING));
-        var custom = new PotionContents(java.util.Optional.of(Potions.HEALING), java.util.Optional.of(0x123456),
-                java.util.List.of(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.SPEED, 200)),
-                java.util.Optional.of("custom"));
+        var custom = new PotionContents(Optional.of(Potions.HEALING), Optional.of(0x123456),
+                List.of(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.SPEED, 200)),
+                Optional.of("custom"));
         healing.set(DataComponents.POTION_CONTENTS, custom);
         var customResult = ItemDataFusion.prepare(ItemDataFusion.brew(brewing, healing, glowstone), healing, glowstone, true);
         assertEquals(custom.customEffects(), customResult.get(DataComponents.POTION_CONTENTS).customEffects());

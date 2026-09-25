@@ -2,6 +2,7 @@ package dev.rocks.infinitecraft;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import dev.rocks.infinitecraft.core.ValidationPatterns;
 import dev.rocks.infinitecraft.provider.ProviderConfig;
 
 import java.io.IOException;
@@ -114,9 +115,9 @@ public final class ModConfig {
             throw new IllegalArgumentException("Config limits are out of range");
         excludedIds = Set.copyOf(excludedIds);
         excludedNamespaces = Set.copyOf(excludedNamespaces);
-        if (disabledTraits.stream().anyMatch(id -> !dev.rocks.infinitecraft.core.ValidationPatterns.isTraitId(id))
+        if (disabledTraits.stream().anyMatch(id -> !ValidationPatterns.isTraitId(id))
                 || traitChances.entrySet().stream().anyMatch(entry ->
-                        !dev.rocks.infinitecraft.core.ValidationPatterns.isTraitId(entry.getKey())
+                        !ValidationPatterns.isTraitId(entry.getKey())
                                 || entry.getValue() == null || entry.getValue() < 0 || entry.getValue() > 100))
             throw new IllegalArgumentException("Invalid trait settings");
         disabledTraits = Set.copyOf(disabledTraits);

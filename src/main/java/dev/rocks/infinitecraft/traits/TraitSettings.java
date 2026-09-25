@@ -3,12 +3,13 @@ package dev.rocks.infinitecraft.traits;
 import dev.rocks.infinitecraft.InfiniteCraftMod;
 
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /** Live trigger settings come from the host, never from a joining client's configuration. */
 public final class TraitSettings {
     public static final Set<String> CHANCE_TRAITS = TraitRegistry.definitions().stream()
             .filter(trait -> trait.triggerChance() >= 0).map(TraitDefinition::id)
-            .collect(java.util.stream.Collectors.toUnmodifiableSet());
+            .collect(Collectors.toUnmodifiableSet());
 
     private TraitSettings() {}
 

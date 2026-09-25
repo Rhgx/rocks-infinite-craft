@@ -1,6 +1,7 @@
 package dev.rocks.infinitecraft.provider;
 
 import dev.rocks.infinitecraft.core.GenerationRequest;
+import dev.rocks.infinitecraft.core.InvalidRecipeResponseException;
 import dev.rocks.infinitecraft.core.RecipeGenerator;
 import dev.rocks.infinitecraft.core.RecipeResult;
 
@@ -11,8 +12,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -141,27 +145,27 @@ public final class CodexRecipeGenerator implements RecipeGenerator {
         properties.getAsJsonObject("name").add("type", JSON.toJsonTree(List.of("string", "null")));
         var strengthTraits = properties.getAsJsonObject("strengths").getAsJsonObject("properties").keySet();
         properties.add("strengths", controlSchema(strengthTraits, request.maxTraits(), "value",
-                JSON.toJsonTree(java.util.Map.of("type", "number", "minimum", 0, "maximum", 1))));
+                JSON.toJsonTree(Map.of("type", "number", "minimum", 0, "maximum", 1))));
         var activationProperties = properties.getAsJsonObject("activations").getAsJsonObject("properties");
-        var modes = new java.util.LinkedHashSet<String>();
+        var modes = new LinkedHashSet<String>();
         activationProperties.entrySet().forEach(entry -> entry.getValue().getAsJsonObject().getAsJsonArray("enum")
                 .forEach(mode -> modes.add(mode.getAsString())));
         properties.add("activations", controlSchema(activationProperties.keySet(), request.maxTraits(), "mode",
-                JSON.toJsonTree(java.util.Map.of("type", "string", "enum", modes))));
+                JSON.toJsonTree(Map.of("type", "string", "enum", modes))));
         properties.getAsJsonObject("traits").remove("uniqueItems");
         return schema;
     }
 
-    private static com.google.gson.JsonElement controlSchema(java.util.Set<String> traits, int limit, String valueKey,
+    private static com.google.gson.JsonElement controlSchema(Set<String> traits, int limit, String valueKey,
             com.google.gson.JsonElement valueSchema) {
-        return JSON.toJsonTree(java.util.Map.of("type", "array", "maxItems", traits.isEmpty() ? 0 : limit,
-                "items", java.util.Map.of("type", "object", "additionalProperties", false,
-                        "required", List.of("trait", valueKey), "properties", java.util.Map.of(
-                                "trait", java.util.Map.of("type", "string", "enum", traits.isEmpty() ? List.of("") : traits),
+        return JSON.toJsonTree(Map.of("type", "array", "maxItems", traits.isEmpty() ? 0 : limit,
+                "items", Map.of("type", "object", "additionalProperties", false,
+                        "required", List.of("trait", valueKey), "properties", Map.of(
+                                "trait", Map.of("type", "string", "enum", traits.isEmpty() ? List.of("") : traits),
                                 valueKey, valueSchema))));
     }
 
-    static List<RecipeResult> parseCandidates(String text, GenerationRequest request) throws dev.rocks.infinitecraft.core.InvalidRecipeResponseException {
+    static List<RecipeResult> parseCandidates(String text, GenerationRequest request) throws InvalidRecipeResponseException {
         try {
             var payload = RecipeResponseParser.parseObject(text);
             if (payload.has("results") && payload.get("results").isJsonArray()) {
@@ -179,7 +183,7 @@ public final class CodexRecipeGenerator implements RecipeGenerator {
             } else normalizeControls(payload);
             return RecipeResponseParser.parseCandidates(payload.toString(), request);
         } catch (IOException | RuntimeException error) {
-            throw new dev.rocks.infinitecraft.core.InvalidRecipeResponseException();
+            throw new InvalidRecipeResponseException();
         }
     }
 
@@ -195,7 +199,7 @@ public final class CodexRecipeGenerator implements RecipeGenerator {
             for (var entry : entries) {
                 if (!entry.isJsonObject()) throw new IllegalArgumentException();
                 var object = entry.getAsJsonObject();
-                if (!object.keySet().equals(java.util.Set.of("trait", valueKey))
+                if (!object.keySet().equals(Set.of("trait", valueKey))
                         || !object.get("trait").isJsonPrimitive()
                         || !object.getAsJsonPrimitive("trait").isString()) throw new IllegalArgumentException();
                 String trait = object.get("trait").getAsString();

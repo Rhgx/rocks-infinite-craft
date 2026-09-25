@@ -8,6 +8,7 @@ import me.shedaniel.clothconfig2.gui.entries.IntegerSliderEntry;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 
+import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -72,6 +73,6 @@ final class ConfigEntries {
 
     /** Shows a tick count as seconds, the unit players think in. */
     static Component seconds(int ticks) {
-        return Component.literal(ticks % 20 == 0 ? ticks / 20 + " s" : String.format(java.util.Locale.ROOT, "%.2f s", ticks / 20.0));
+        return Component.literal(ticks % 20 == 0 ? ticks / 20 + " s" : String.format(Locale.ROOT, "%.2f s", ticks / 20.0));
     }
 }

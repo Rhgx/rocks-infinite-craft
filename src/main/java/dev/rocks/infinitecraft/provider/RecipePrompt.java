@@ -6,8 +6,10 @@ import com.google.gson.JsonObject;
 import dev.rocks.infinitecraft.core.GenerationRequest;
 import dev.rocks.infinitecraft.core.TraitStrengths;
 import dev.rocks.infinitecraft.traits.TraitRegistry;
+import dev.rocks.infinitecraft.traits.TraitSettings;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 
 final class RecipePrompt {
     private static final Gson JSON = new Gson();
@@ -77,7 +79,7 @@ final class RecipePrompt {
         } else {
             data.add("adjustableTraits", JSON.toJsonTree(request.supportedTraits().stream()
                     .filter(TraitStrengths.RANGES::containsKey).toList()));
-            var groups = new LinkedHashMap<java.util.List<String>, String>();
+            var groups = new LinkedHashMap<List<String>, String>();
             var modes = new LinkedHashMap<String, String>();
             var descriptions = new LinkedHashMap<String, String>();
             var chances = new LinkedHashMap<String, Integer>();
@@ -88,7 +90,7 @@ final class RecipePrompt {
                 modes.put(id, groups.computeIfAbsent(allowed, ignored -> "group" + (groups.size() + 1)));
                 if (!trait.description().isEmpty()) descriptions.put(id, trait.description());
                 if (trait.triggerChance() >= 0) {
-                    int chance = Math.round(dev.rocks.infinitecraft.traits.TraitSettings.chance(id) * 100);
+                    int chance = Math.round(TraitSettings.chance(id) * 100);
                     if (chance != Math.round(trait.triggerChance() * 100)) chances.put(id, chance);
                 }
             }
