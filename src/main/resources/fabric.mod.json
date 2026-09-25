@@ -15,11 +15,15 @@
     ],
     "client": [
       "dev.rocks.infinitecraft.client.FusionCrafterModels"
+    ],
+    "jei_mod_plugin": [
+      "dev.rocks.infinitecraft.client.jei.FusionJeiPlugin"
     ]
   },
   "suggests": {
     "cloth-config": ">=26.2.155",
-    "modmenu": ">=20.0.1"
+    "modmenu": ">=20.0.1",
+    "jei": ">=30.38.0"
   },
   "depends": {
     "fabricloader": ">=0.19.5",
