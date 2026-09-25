@@ -32,6 +32,8 @@ public final class LuckyBlockTrait implements TraitDefinition {
     public static final String ID = "lucky_block";
     private static final Map<ServerPlayer, Integer> IMMORTAL_UNTIL = new IdentityHashMap<>();
     private static final Map<ServerPlayer, Integer> LAST_USE = new IdentityHashMap<>();
+    private static final ChatFormatting[] RAINBOW = {ChatFormatting.RED, ChatFormatting.GOLD, ChatFormatting.YELLOW,
+            ChatFormatting.GREEN, ChatFormatting.AQUA, ChatFormatting.BLUE, ChatFormatting.LIGHT_PURPLE};
 
     @Override public String id() { return ID; }
     @Override public String hint() { return "♦ Lucky Block · Single use"; }
@@ -78,8 +80,8 @@ public final class LuckyBlockTrait implements TraitDefinition {
         if (coolingDown(serverPlayer.tickCount, LAST_USE.get(serverPlayer))) return InteractionResult.SUCCESS_SERVER;
         LAST_USE.put(serverPlayer, serverPlayer.tickCount);
         stack.shrink(1);
-        String outcome = roll(serverPlayer, serverPlayer.getRandom().nextInt(100));
-        serverPlayer.sendSystemMessage(Component.literal("♦ " + outcome).withStyle(ChatFormatting.GOLD), true);
+        int outcome = outcome(serverPlayer.getRandom().nextInt(100));
+        serverPlayer.sendSystemMessage(message(outcome, "♦ " + apply(serverPlayer, outcome)), true);
         serverPlayer.inventoryMenu.sendAllDataToRemote();
         return InteractionResult.SUCCESS_SERVER;
     }
@@ -94,17 +96,33 @@ public final class LuckyBlockTrait implements TraitDefinition {
         return previous != null && tick >= previous && (long) tick - previous < 5;
     }
 
+    /** Immortal and Unlucky get 4% each; the other eleven outcomes share the remaining 92%. */
     static int outcome(int roll) {
-        if (roll < 0 || roll >= 100) throw new IllegalArgumentException("Roll must be 0–99");
-        return roll < 2 ? 0 : roll < 4 ? 1 : 2 + (roll - 4) * 11 / 96;
+        if (roll < 0 || roll >= 100) throw new IllegalArgumentException("Roll must be 0 to 99");
+        return roll < 4 ? 0 : roll < 8 ? 1 : 2 + (roll - 8) * 11 / 92;
     }
 
-    private static String roll(ServerPlayer player, int roll) {
-        return switch (outcome(roll)) {
+    /** Immortal is spelled out in rainbow colors, one per character, Unlucky in dark red, the rest in gold. */
+    static Component message(int outcome, String text) {
+        if (outcome == 1) return Component.literal(text).withStyle(ChatFormatting.DARK_RED);
+        if (outcome != 0) return Component.literal(text).withStyle(ChatFormatting.GOLD);
+        var message = Component.empty();
+        int colored = 0;
+        for (int i = 0; i < text.length(); i = text.offsetByCodePoints(i, 1)) {
+            String character = text.substring(i, text.offsetByCodePoints(i, 1));
+            // Spaces take no color, so the visible characters step through the rainbow evenly.
+            message.append(character.isBlank() ? Component.literal(character)
+                    : Component.literal(character).withStyle(RAINBOW[colored++ % RAINBOW.length]));
+        }
+        return message;
+    }
+
+    private static String apply(ServerPlayer player, int outcome) {
+        return switch (outcome) {
             case 0 -> {
                 IMMORTAL_UNTIL.put(player, player.tickCount + 600);
                 effect(player, MobEffects.GLOWING, 30, 0);
-                LuckyBlockEffects.rainbow(player);
+                LuckyBlockEffects.starPower(player);
                 yield "Immortal! 30 seconds.";
             }
             case 1 -> {
