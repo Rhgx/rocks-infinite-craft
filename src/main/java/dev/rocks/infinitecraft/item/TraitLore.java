@@ -3,7 +3,6 @@ package dev.rocks.infinitecraft.item;
 import dev.rocks.infinitecraft.fusion.FusionCount;
 import dev.rocks.infinitecraft.traits.TraitDefinition;
 import dev.rocks.infinitecraft.traits.TraitRegistry;
-import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
@@ -12,26 +11,31 @@ import net.minecraft.world.item.component.ItemLore;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /** Hint at how an item can be used without revealing its effect. */
 public final class TraitLore {
+    public static final String EDIBLE = "🍎 Edible";
+    public static final int EDIBLE_COLOR = 0x55FF55;
+    public static final String WEARABLE = "👕 Wearable";
+    public static final int WEARABLE_COLOR = 0x6FB7FF;
     private static final Map<String, Component> LINES = TraitRegistry.definitions().stream()
             .filter(trait -> !trait.hint().isEmpty())
             .collect(Collectors.toUnmodifiableMap(
                     TraitDefinition::id, trait -> line(trait.hint(), trait.hintColor())));
     private static final Map<String, Component> ACTIVATION_LINES = Map.of(
-            "Edible", line("Edible", ChatFormatting.GREEN),
-            "Wearable", line("Wearable", ChatFormatting.AQUA),
-            "Offhand", line("Offhand", ChatFormatting.YELLOW));
-    private static final Set<String> HINT_TEXT = TraitRegistry.definitions().stream()
-            .map(TraitDefinition::hint)
-            .filter(hint -> !hint.isEmpty())
-            .collect(Collectors.toUnmodifiableSet());
+            "Edible", line(EDIBLE, EDIBLE_COLOR),
+            "Wearable", line(WEARABLE, WEARABLE_COLOR),
+            "Offhand", line("✋ Offhand", 0xFFB38A));
 
-    private static Component line(String text, ChatFormatting color) {
+    private static Component line(String text, int color) {
         return Component.literal(text).withStyle(style -> style.withColor(color).withItalic(false));
+    }
+
+    /** Hint text without its leading icon, so lines from older versions still match. */
+    private static String label(String text) {
+        int space = text.indexOf(' ');
+        return space > 0 && !Character.isLetter(text.codePointAt(0)) ? text.substring(space + 1) : text;
     }
 
     public static boolean add(ItemStack stack, List<String> traits) {
@@ -43,7 +47,7 @@ public final class TraitLore {
         boolean offhand = stack.getOrDefault(DataComponents.ATTRIBUTE_MODIFIERS,
                 net.minecraft.world.item.component.ItemAttributeModifiers.EMPTY).modifiers().stream()
                 .anyMatch(entry -> entry.slot() == net.minecraft.world.entity.EquipmentSlotGroup.OFFHAND);
-        if (!offhand) lines.removeIf(line -> line.getString().equals("Offhand"));
+        if (!offhand) lines.removeIf(line -> label(line.getString()).equals("Offhand"));
         for (String trait : traits) {
             Component line = LINES.get(trait);
             if (line != null && !lines.contains(line)) lines.add(line);
@@ -78,7 +82,7 @@ public final class TraitLore {
     }
 
     private static boolean isHint(Component value) {
-        return HINT_TEXT.contains(value.getString()) || ACTIVATION_LINES.containsKey(value.getString());
+        return normalizedHint(value) != null;
     }
 
     private static List<Component> deduplicatedLines(ItemStack stack) {
@@ -92,11 +96,11 @@ public final class TraitLore {
     }
 
     private static Component normalizedHint(Component line) {
-        Component activation = ACTIVATION_LINES.get(line.getString());
+        String label = label(line.getString());
+        Component activation = ACTIVATION_LINES.get(label);
         if (activation != null) return activation;
-        // Existing discoveries can still carry the same hint without its new glyph.
-        return LINES.values().stream().filter(hint -> hint.getString().equals(line.getString())
-                || hint.getString().endsWith(" " + line.getString()))
+        // Existing discoveries can carry the same hint with an older glyph and color, or none.
+        return LINES.values().stream().filter(hint -> label(hint.getString()).equals(label))
                 .findFirst().orElse(null);
     }
 }

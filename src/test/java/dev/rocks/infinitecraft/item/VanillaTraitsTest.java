@@ -78,7 +78,7 @@ class VanillaTraitsTest {
                 Map.of("speedy", "consumed"), plain);
         assertFalse(eaten.isEmpty());
         assertTrue(eaten.get(DataComponents.ATTRIBUTE_MODIFIERS).modifiers().isEmpty());
-        assertEquals(List.of("Edible"), eaten.get(DataComponents.LORE).lines().stream().map(line -> line.getString()).toList());
+        assertEquals(List.of(TraitLore.EDIBLE), eaten.get(DataComponents.LORE).lines().stream().map(line -> line.getString()).toList());
         var effect = (net.minecraft.world.item.consume_effects.ApplyStatusEffectsConsumeEffect)
                 eaten.get(DataComponents.CONSUMABLE).onConsumeEffects().getFirst();
         assertEquals(400, effect.effects().getFirst().getDuration());

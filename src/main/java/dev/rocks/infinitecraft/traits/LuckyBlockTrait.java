@@ -37,7 +37,7 @@ public final class LuckyBlockTrait implements TraitDefinition {
 
     @Override public String id() { return ID; }
     @Override public String hint() { return "♦ Lucky Block · Single use"; }
-    @Override public ChatFormatting hintColor() { return ChatFormatting.GOLD; }
+    @Override public int hintColor() { return 0xFFAA00; }
     @Override public String description() { return "Right-click to consume it and roll a random blessing or curse. Appears on 5% of recipes."; }
     @Override public Set<DataComponentType<?>> components() { return Set.of(); }
     @Override public void apply(ItemStack output, double value) {}

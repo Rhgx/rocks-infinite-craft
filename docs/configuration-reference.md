@@ -76,9 +76,9 @@ Combat traits work on melee hits, bow and crossbow arrows, thrown tridents, snow
 | --- | --- | --- |
 | `startled` | ⚡ Jumpy | Taking an attack while worn grants Speed I for 3 seconds. |
 | `hardened` | ⚓ Stubborn | Taking an attack while worn has a 25% chance to grant Resistance I for 4 seconds. |
-| `cold_shoulder` | ❄ Prickly | Taking an attack while worn has a 30% chance to give the attacker Slowness I for 3 seconds. |
+| `cold_shoulder` | ✴ Prickly | Taking an attack while worn has a 30% chance to give the attacker Slowness I for 3 seconds. |
 | `airy_food` | ☁ Airy | Eating grants Slow Falling for 15 seconds. |
-| `hearty_food` | ♥ Hearty | Eating grants Absorption I for 30 seconds. |
+| `hearty_food` | ✚ Hearty | Eating grants Absorption I for 30 seconds. |
 | `vanishing_food` | ☯ Elusive | Eating grants Invisibility for 15 seconds. |
 | `nibbleable` | 🍖 Nibbleable | Provides 3–8 meals, selected through trait strength; default 5. |
 

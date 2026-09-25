@@ -1,13 +1,12 @@
 package dev.rocks.infinitecraft.traits;
 
-import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.Set;
 
 /** A trait whose behavior is supplied by a server-side gameplay event. */
-record TriggeredTrait(String id, String hint, ChatFormatting hintColor) implements TraitDefinition {
+record TriggeredTrait(String id, String hint, int hintColor) implements TraitDefinition {
     @Override public float triggerChance() { return id.equals("explosive") ? .1F : 1; }
     @Override
     public String description() {

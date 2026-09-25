@@ -1,7 +1,6 @@
 package dev.rocks.infinitecraft.traits;
 
 import dev.rocks.infinitecraft.core.ValidationPatterns;
-import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -62,23 +61,23 @@ public final class TraitRegistry {
                     () -> Attributes.WATER_MOVEMENT_EFFICIENCY, ADD),
             new AttributeTrait("step_up", new StrengthRange(0, 1, .5),
                     () -> Attributes.STEP_HEIGHT, ADD),
-            new TriggeredTrait("explosive", "☄ Volatile", ChatFormatting.RED),
-            new TriggeredTrait("incendiary", "🔥 Burning", ChatFormatting.GOLD),
-            new TriggeredTrait("vampiric", "♥ Bloodthirsty", ChatFormatting.DARK_RED),
-            new TriggeredTrait("launching", "☁ Uplifting", ChatFormatting.LIGHT_PURPLE),
-            new TriggeredTrait("frostbite", "❄ Chilly", ChatFormatting.AQUA),
-            new TriggeredTrait("revealing", "☀ Exposing", ChatFormatting.YELLOW),
-            new ReactiveArmorTrait("startled", "⚡ Jumpy", ChatFormatting.YELLOW,
+            new TriggeredTrait("explosive", "☄ Volatile", 0xFF5555),
+            new TriggeredTrait("incendiary", "🔥 Burning", 0xFF8C1A),
+            new TriggeredTrait("vampiric", "♥ Bloodthirsty", 0xDC143C),
+            new TriggeredTrait("launching", "⬆ Uplifting", 0xB388FF),
+            new TriggeredTrait("frostbite", "❄ Chilly", 0x55FFFF),
+            new TriggeredTrait("revealing", "☀ Exposing", 0xFFFF55),
+            new ReactiveArmorTrait("startled", "⚡ Jumpy", 0xC6FF3D,
                     "While worn, taking an attack grants Speed I for 3 seconds.", MobEffects.SPEED, 60, 1, false),
-            new ReactiveArmorTrait("hardened", "⚓ Stubborn", ChatFormatting.GRAY,
+            new ReactiveArmorTrait("hardened", "⚓ Stubborn", 0xAAAAAA,
                     "While worn, attacks have a 25% chance to grant Resistance I for 4 seconds.", MobEffects.RESISTANCE, 80, .25F, false),
-            new ReactiveArmorTrait("cold_shoulder", "❄ Prickly", ChatFormatting.AQUA,
+            new ReactiveArmorTrait("cold_shoulder", "✴ Prickly", 0x3FE0C5,
                     "While worn, attacks have a 30% chance to slow the attacker for 3 seconds.", MobEffects.SLOWNESS, 60, .3F, true),
-            new EffectFoodTrait("airy_food", "☁ Airy", ChatFormatting.WHITE,
+            new EffectFoodTrait("airy_food", "☁ Airy", 0xF2F2F2,
                     "Eating grants Slow Falling for 15 seconds.", MobEffects.SLOW_FALLING, 300, 1),
-            new EffectFoodTrait("hearty_food", "♥ Hearty", ChatFormatting.GOLD,
+            new EffectFoodTrait("hearty_food", "✚ Hearty", 0xFF7AB6,
                     "Eating grants Absorption I for 30 seconds.", MobEffects.ABSORPTION, 600, 1),
-            new EffectFoodTrait("vanishing_food", "☯ Elusive", ChatFormatting.LIGHT_PURPLE,
+            new EffectFoodTrait("vanishing_food", "☯ Elusive", 0xFF55FF,
                     "Eating grants Invisibility for 15 seconds.", MobEffects.INVISIBILITY, 300, 1),
             new NibbleableTrait(),
             new BlockingTrait(),

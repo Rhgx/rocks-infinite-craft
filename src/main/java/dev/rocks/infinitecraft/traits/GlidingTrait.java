@@ -1,6 +1,6 @@
 package dev.rocks.infinitecraft.traits;
 
-import net.minecraft.ChatFormatting;
+import dev.rocks.infinitecraft.item.TraitLore;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.util.Unit;
@@ -18,12 +18,12 @@ public final class GlidingTrait implements TraitDefinition {
 
     @Override
     public String hint() {
-        return "Wearable";
+        return TraitLore.WEARABLE;
     }
 
     @Override
-    public ChatFormatting hintColor() {
-        return ChatFormatting.AQUA;
+    public int hintColor() {
+        return TraitLore.WEARABLE_COLOR;
     }
 
     @Override
