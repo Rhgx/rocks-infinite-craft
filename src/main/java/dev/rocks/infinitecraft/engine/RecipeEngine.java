@@ -37,7 +37,14 @@ public final class RecipeEngine implements AutoCloseable {
     private final Map<String, Future<?>> tasks = new HashMap<>();
     private final Map<String, CompletableFuture<Void>> edits = new HashMap<>();
     private final Set<String> activeKeys = new HashSet<>();
+    private final Map<String, Integer> attempts = new HashMap<>();
     private volatile boolean closed;
+
+    public synchronized String generationStatus(String key) {
+        if (!pending.containsKey(key)) return null;
+        Integer attempt = attempts.get(key);
+        return attempt != null && attempt > 1 ? "Retrying fusion..." : "Generating...";
+    }
 
     public record QueuePosition(int position, int total) {
     }
@@ -164,6 +171,7 @@ public final class RecipeEngine implements AutoCloseable {
             }
         } finally {
             synchronized (this) {
+                attempts.remove(key);
                 activeKeys.remove(key);
                 tasks.remove(key);
             }
@@ -186,16 +194,23 @@ public final class RecipeEngine implements AutoCloseable {
             String failureKey, CompletableFuture<RecipeResult> future) throws Exception {
         Set<String> shortlist = eligible(request);
         if (shortlist.isEmpty()) throw new IOException("No eligible crafting candidates available");
+        String feedback = "";
+        long started = System.nanoTime();
         for (int attempt = 0; attempt < generationAttempts; attempt++) {
             if (closed || future.isDone() || Thread.currentThread().isInterrupted()) throw new CancellationException();
             List<RecipeResult> candidates;
             try {
-                candidates = generator.generateCandidates(request);
+                synchronized (this) { attempts.put(failureKey, attempt + 1); }
+                candidates = generator.generateCandidates(request, feedback);
             } catch (InvalidRecipeResponseException invalid) {
+                feedback = "Previous response had no valid JSON recipe. Correct its format and use only supplied IDs and allowed controls.";
                 continue;
             }
+            feedback = "Previous candidates failed validation. Use compatible traits and activation modes, respect inherited traits and limits, and avoid combining consumed, wearable or blocking behavior.";
             if (candidates == null) continue;
+            int candidateIndex = 0;
             for (RecipeResult candidate : candidates.stream().limit(5).toList()) {
+                candidateIndex++;
                 try {
                     validate(candidate, shortlist);
                     validate(candidate, allowed);
@@ -203,10 +218,17 @@ public final class RecipeEngine implements AutoCloseable {
                     continue;
                 }
                 candidate = RecipeQuality.apply(candidate, request);
-                if (candidate.count() <= request.maxOutputCount() && validator.test(candidate)) return candidate;
+                if (candidate.count() <= request.maxOutputCount() && validator.test(candidate)) {
+                    org.slf4j.LoggerFactory.getLogger(RecipeEngine.class).debug(
+                            "Recipe accepted on attempt {}, candidate {}, after {} ms",
+                            attempt + 1, candidateIndex, (System.nanoTime() - started) / 1_000_000);
+                    return candidate;
+                }
             }
         }
         if (closed || future.isDone() || Thread.currentThread().isInterrupted()) throw new CancellationException();
+        org.slf4j.LoggerFactory.getLogger(RecipeEngine.class).debug(
+                "Recipe rejected after {} attempts and {} ms", generationAttempts, (System.nanoTime() - started) / 1_000_000);
         if (failureKey != null) store.blockIf(failureKey, () -> !closed && !future.isDone());
         throw new BlockedRecipeException();
     }

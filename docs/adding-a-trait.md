@@ -62,3 +62,5 @@ Keep existing trait and modifier IDs stable because saved items and recipes use 
 Run the [tests](testing.md). Cover the actual effect, strength bounds, repeated application, incompatible targets, native serialization, and inheritance. Registry-driven tests use a stick fixture; supply another item if the trait rejects it.
 
 Finally, try holding, wearing, or consuming the result in-game, including with a vanilla guest.
+
+Override `triggerChance()` for a trait with a configurable activation probability (0–1). This automatically adds its chance slider in the Traits tab. Runtime triggers read `TraitSettings.chance(id)`; vanilla food effects store that value when the output is created.

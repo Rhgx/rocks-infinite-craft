@@ -23,7 +23,7 @@ import java.util.function.Consumer;
 
 /** Encodes and atomically persists a world's discovery collection. */
 final class DiscoveryStore {
-    record Stored(DiscoveryCollection.Entry entry, Set<UUID> owners, String encoded) {
+    record Stored(DiscoveryCollection.Entry entry, Set<UUID> owners, Set<UUID> favorites, String encoded) {
     }
 
     private final Path file;
@@ -58,7 +58,10 @@ final class DiscoveryStore {
                 if (value.has("players")) {
                     value.getAsJsonArray("players").forEach(id -> owners.add(UUID.fromString(id.getAsString())));
                 }
-                stored.add(new Stored(entry, owners, value.toString()));
+                var favorites = new HashSet<UUID>();
+                if (value.has("favorites")) value.getAsJsonArray("favorites")
+                        .forEach(id -> favorites.add(UUID.fromString(id.getAsString())));
+                stored.add(new Stored(entry, owners, favorites, value.toString()));
             }
             return List.copyOf(stored);
         } catch (RuntimeException invalid) {
@@ -66,7 +69,7 @@ final class DiscoveryStore {
         }
     }
 
-    String encode(DiscoveryCollection.Entry entry, Set<UUID> owners) {
+    String encode(DiscoveryCollection.Entry entry, Set<UUID> owners, Set<UUID> favorites) {
         var value = new JsonObject();
         value.add("first", ItemStack.CODEC.encodeStart(ops, entry.first()).getOrThrow());
         value.add("second", ItemStack.CODEC.encodeStart(ops, entry.second()).getOrThrow());
@@ -80,6 +83,9 @@ final class DiscoveryStore {
         var players = new JsonArray();
         owners.stream().map(UUID::toString).sorted().forEach(players::add);
         value.add("players", players);
+        var starred = new JsonArray();
+        favorites.stream().map(UUID::toString).sorted().forEach(starred::add);
+        value.add("favorites", starred);
         return value.toString();
     }
 

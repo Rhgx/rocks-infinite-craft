@@ -15,6 +15,58 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.*;
 
 class HttpRecipeGeneratorTest {
+    @Test void connectionTestCancellationReleasesTheTestGate() throws Exception {
+        var arrived = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/", exchange -> {
+            arrived.countDown();
+            try { release.await(5, java.util.concurrent.TimeUnit.SECONDS); }
+            catch (InterruptedException error) { Thread.currentThread().interrupt(); }
+            finally { exchange.close(); }
+        });
+        server.start();
+        try {
+            var config = new ProviderConfig("ollama", "http://127.0.0.1:" + server.getAddress().getPort(), "test", "", 30);
+            var pending = ProviderConnectionTest.start(config);
+            assertTrue(arrived.await(5, java.util.concurrent.TimeUnit.SECONDS));
+            assertTrue(pending.cancel(true));
+            long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+            ProviderConnectionTest.Result result;
+            do {
+                result = ProviderConnectionTest.start(ProviderConfig.defaults()).get(2, java.util.concurrent.TimeUnit.SECONDS);
+                if (!result.message().contains("already running")) break;
+                Thread.sleep(10);
+            } while (System.nanoTime() < deadline);
+            assertEquals("Choose a provider before testing the connection.", result.message());
+        } finally {
+            release.countDown();
+            server.stop(0);
+        }
+    }
+
+    @Test void compactPromptsKeepChoicesAndExcludeUnavailableIntenseModes() {
+        var special = new GenerationRequest(REQUEST.first(), REQUEST.second(), REQUEST.candidates(),
+                List.of("speedy", "strong", "launching"));
+        String plainPrompt = RecipePrompt.build(REQUEST);
+        String specialPrompt = RecipePrompt.build(special);
+        assertTrue(plainPrompt.contains("Return 1 candidate results."));
+        assertTrue(specialPrompt.contains("Return 2 candidate results."));
+        assertTrue(RecipePrompt.build(special, false, "Previous response was invalid.")
+                .contains("Return 5 candidate results."));
+        var data = JsonParser.parseString(specialPrompt.substring(specialPrompt.indexOf("\nIngredients and candidates:\n")
+                + "\nIngredients and candidates:\n".length())).getAsJsonObject();
+        var options = data.getAsJsonObject("activationOptions");
+        assertEquals(options.get("speedy"), options.get("strong"));
+        assertFalse(data.getAsJsonObject("activationGroups").toString().contains("consumed_intense"));
+        assertTrue(data.getAsJsonObject("traitDescriptions").has("launching"));
+        var properties = RecipeSchema.build(special).getAsJsonObject().getAsJsonObject("properties")
+                .getAsJsonObject("results").getAsJsonObject("items").getAsJsonObject("properties");
+        assertFalse(properties.getAsJsonObject("activations").toString().contains("consumed_intense"));
+        assertFalse(properties.getAsJsonObject("nameStyle").has("required"));
+        assertEquals(3, properties.getAsJsonObject("traits").getAsJsonObject("items").getAsJsonArray("enum").size());
+    }
+
     @Test void modelQuantityUsesRequestBoundsForPlainAndSpecialResults() throws Exception {
         var request = new GenerationRequest(REQUEST.first(), REQUEST.second(), REQUEST.candidates(), List.of("speedy"), List.of(), 12);
         String response = "{\"itemId\":\"minecraft:cobblestone\",\"traits\":[\"speedy\"],\"count\":";
@@ -110,6 +162,7 @@ class HttpRecipeGeneratorTest {
                 if (provider.equals("openai")) assertFalse(request.get().get("store").getAsBoolean());
                 if (provider.equals("ollama")) {
                     assertFalse(request.get().get("stream").getAsBoolean());
+                    assertEquals(-1, request.get().get("keep_alive").getAsInt());
                     assertFalse(request.get().get("think").getAsBoolean());
                     var schema = request.get().getAsJsonObject("format");
                     assertFalse(schema.get("additionalProperties").getAsBoolean());

@@ -13,7 +13,7 @@ final class RecipePrompt {
     private static final Gson JSON = new Gson();
     private static final String INSTRUCTION = String.join(" ",
             "Combine the two Minecraft ingredients creatively.",
-            "Return five candidate results, best first, using only craftable candidate IDs.",
+            "Use only craftable candidate IDs, best result first.",
             "Choose a fitting total count from 1 to maxOutputCount based on the ingredients and result.",
             "Usually choose small amounts; do not always use the maximum.",
             "Quantity is independent of stack size, even for equipment and special items.",
@@ -35,10 +35,17 @@ final class RecipePrompt {
     }
 
     static String build(GenerationRequest request, boolean listControls) {
+        return build(request, listControls, "");
+    }
+
+    static String build(GenerationRequest request, boolean listControls, String feedback) {
         JsonObject data = requestData(request);
+        int count = feedback.isEmpty() ? (request.supportedTraits().isEmpty() ? 1 : 2) : 5;
         String guidance = String.join(" ",
                 INSTRUCTION,
                 PREFERENCES,
+                "Return " + count + " candidate results.",
+                feedback,
                 qualityGuidance(request),
                 resultGuidance(request, listControls),
                 potionGuidance(request),
@@ -70,9 +77,27 @@ final class RecipePrompt {
         } else {
             data.add("adjustableTraits", JSON.toJsonTree(request.supportedTraits().stream()
                     .filter(TraitStrengths.RANGES::containsKey).toList()));
-            var modes = new LinkedHashMap<String, Object>();
-            request.supportedTraits().forEach(id -> modes.put(id, TraitRegistry.get(id).activationModes()));
+            var groups = new LinkedHashMap<java.util.List<String>, String>();
+            var modes = new LinkedHashMap<String, String>();
+            var descriptions = new LinkedHashMap<String, String>();
+            var chances = new LinkedHashMap<String, Integer>();
+            for (String id : request.supportedTraits()) {
+                var trait = TraitRegistry.get(id);
+                var allowed = trait.activationModes().stream()
+                        .filter(mode -> !mode.equals("consumed_intense") || request.rarityQuality() >= 75).toList();
+                modes.put(id, groups.computeIfAbsent(allowed, ignored -> "group" + (groups.size() + 1)));
+                if (!trait.description().isEmpty()) descriptions.put(id, trait.description());
+                if (trait.triggerChance() >= 0) {
+                    int chance = Math.round(dev.rocks.infinitecraft.traits.TraitSettings.chance(id) * 100);
+                    if (chance != Math.round(trait.triggerChance() * 100)) chances.put(id, chance);
+                }
+            }
+            var definitions = new LinkedHashMap<String, Object>();
+            groups.forEach((options, group) -> definitions.put(group, options));
+            data.add("activationGroups", JSON.toJsonTree(definitions));
             data.add("activationOptions", JSON.toJsonTree(modes));
+            data.add("traitDescriptions", JSON.toJsonTree(descriptions));
+            if (!chances.isEmpty()) data.add("hostChanceOverridesPercent", JSON.toJsonTree(chances));
         }
         return data;
     }
@@ -100,7 +125,7 @@ final class RecipePrompt {
         return String.join(" ",
                 "This recipe may have a special result, but only add a name or traits if they fit the ingredients. Plain results are also valid.",
                 nameGuidance(),
-                activationGuidance(listControls),
+                activationGuidance(listControls, request.rarityQuality() >= 75),
                 traitGuidance(listControls));
     }
 
@@ -108,22 +133,23 @@ final class RecipePrompt {
         return String.join(" ",
                 "Optional names must be plain text, at most 64 characters, without control characters.",
                 "Optional nameStyle formats the supplied name using color (#RRGGBB or empty for default), bold, italic, underlined, strikethrough and obfuscated booleans.",
-                "Optional nameParts splits the name into up to eight literal text segments, each with its own complete style object.",
+                "Optional nameParts splits the name into up to eight literal text segments, each with its own style object. Omitted style flags are false; omitted color uses the default.",
                 "Their text must concatenate exactly to name, at most 64 characters total. Use an empty list for whole-name styling.",
                 "Segment styles are independent; empty color uses the default.",
                 "Obfuscate only deliberate mystery fragments and keep most names readable.");
     }
 
-    private static String activationGuidance(boolean listControls) {
+    private static String activationGuidance(boolean listControls, boolean intense) {
         String shape = listControls
                 ? "Optional activations is an array of {trait,mode} entries for selected traits using activationOptions."
                 : "Optional activations maps selected traits to one of their activationOptions.";
         return String.join(" ",
                 shape,
+                "activationOptions references the allowed mode list in activationGroups.",
                 "auto uses the trait's natural behavior; mainhand/offhand requires holding it there; head/chest/legs/feet makes it wearable in that slot.",
                 "Consider offhand for defensive or supporting items meant to accompany another tool.",
                 "consumed, consumed_brief and consumed_long make an attribute trait edible for 20, 10 or 60 seconds, with levels I to III according to strength.",
-                "consumed_intense gives level IV for 8 seconds and is accepted only for the rarest ingredients; use it exceptionally.",
+                intense ? "consumed_intense gives level IV for 8 seconds; use it exceptionally." : "",
                 "Food traits keep their own consume behavior. Choose a coherent use for the item; consumed modes cannot be combined with wearable or blocking behavior.");
     }
 

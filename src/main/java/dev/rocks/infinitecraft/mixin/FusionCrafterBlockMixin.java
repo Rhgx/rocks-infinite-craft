@@ -20,7 +20,7 @@ abstract class FusionCrafterBlockMixin {
         // Marked stations never fall through to ordinary crafting, even with fusion disabled.
         if (level.getBlockEntity(pos) instanceof net.minecraft.world.level.block.entity.CrafterBlockEntity block
                 && InfiniteCraftMod.isFusionCrafter(block)) {
-            InfiniteCraftMod.triggerCrafter(block);
+            InfiniteCraftMod.pulseCrafter(block);
             ci.cancel();
         }
     }

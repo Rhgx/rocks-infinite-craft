@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Set;
+import java.util.Map;
 
 public final class ModConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -54,6 +55,8 @@ public final class ModConfig {
     public int cooldownTicks = 100;
     public Set<String> excludedIds = Set.of();
     public Set<String> excludedNamespaces = Set.of();
+    public Set<String> disabledTraits = Set.of();
+    public Map<String, Integer> traitChances = Map.of();
 
     public boolean sameCatalog(ModConfig other) {
         return allowModdedItems == other.allowModdedItems && excludedIds.equals(other.excludedIds)
@@ -71,7 +74,8 @@ public final class ModConfig {
                 && maxOutputCount == other.maxOutputCount && maxTraits == other.maxTraits
                 && specialCombinationLimit == other.specialCombinationLimit
                 && power == other.power && silliness == other.silliness && maxPending == other.maxPending
-                && candidateLimit == other.candidateLimit;
+                && candidateLimit == other.candidateLimit && disabledTraits.equals(other.disabledTraits)
+                && traitChances.equals(other.traitChances);
     }
 
     public static ModConfig load(Path file) throws IOException {
@@ -94,7 +98,7 @@ public final class ModConfig {
     }
 
     public void validate() {
-        if (provider == null || excludedIds == null || excludedNamespaces == null)
+        if (provider == null || excludedIds == null || excludedNamespaces == null || disabledTraits == null || traitChances == null)
             throw new IllegalArgumentException("Missing config values");
         if (generationEnabled && provider.provider().equals("disabled"))
             throw new IllegalArgumentException("Choose a provider before enabling generation");
@@ -110,6 +114,13 @@ public final class ModConfig {
             throw new IllegalArgumentException("Config limits are out of range");
         excludedIds = Set.copyOf(excludedIds);
         excludedNamespaces = Set.copyOf(excludedNamespaces);
+        if (disabledTraits.stream().anyMatch(id -> !dev.rocks.infinitecraft.core.ValidationPatterns.isTraitId(id))
+                || traitChances.entrySet().stream().anyMatch(entry ->
+                        !dev.rocks.infinitecraft.core.ValidationPatterns.isTraitId(entry.getKey())
+                                || entry.getValue() == null || entry.getValue() < 0 || entry.getValue() > 100))
+            throw new IllegalArgumentException("Invalid trait settings");
+        disabledTraits = Set.copyOf(disabledTraits);
+        traitChances = Map.copyOf(traitChances);
     }
 
     public void save(Path file) throws IOException {

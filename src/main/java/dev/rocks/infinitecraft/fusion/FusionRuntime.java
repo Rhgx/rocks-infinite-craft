@@ -85,6 +85,10 @@ public final class FusionRuntime implements AutoCloseable {
         return crafters.preview(block);
     }
 
+    public boolean crafterWorking(CrafterBlockEntity block) {
+        return crafters.working(block);
+    }
+
     public void crafterUser(CrafterBlockEntity block, ServerPlayer player) {
         crafters.user(block, player);
     }
@@ -103,7 +107,7 @@ public final class FusionRuntime implements AutoCloseable {
 
     String queueMessage(String key) {
         var queue = engine.queuePosition(key);
-        return queue == null ? null : "Fusion queued" + ".".repeat(1 + (int) ((ticks / 10) % 3))
+        return queue == null ? engine.generationStatus(key) : "Fusion queued" + ".".repeat(1 + (int) ((ticks / 10) % 3))
                 + " (" + queue.position() + "/" + queue.total() + ")";
     }
     public void unloadCrafter(CrafterBlockEntity block) {
@@ -180,6 +184,10 @@ public final class FusionRuntime implements AutoCloseable {
             public List<RecipeResult> generateCandidates(GenerationRequest request) throws Exception {
                 if (!settings.generationEnabled) throw new IllegalStateException("Recipe generation is disabled");
                 return provider.generateCandidates(request);
+            }
+            public List<RecipeResult> generateCandidates(GenerationRequest request, String feedback) throws Exception {
+                if (!settings.generationEnabled) throw new IllegalStateException("Recipe generation is disabled");
+                return provider.generateCandidates(request, feedback);
             }
         }, settings.maxPending, settings.generationAttempts, settings.generationThreads);
     }
@@ -298,6 +306,20 @@ public final class FusionRuntime implements AutoCloseable {
     public List<DiscoveryCollection.Entry> discoveries(ServerPlayer player) {
         return config.personalBook ? discoveries.entries(player.getUUID(), player.getName().getString()) : discoveries.entries();
     }
+    public Set<Integer> favoriteIds(ServerPlayer player) {
+        return discoveries.favoriteIds(player.getUUID()).stream().filter(id -> !config.personalBook
+                || discoveries.owns(id, player.getUUID(), player.getName().getString())).collect(Collectors.toSet());
+    }
+
+    public boolean toggleFavorite(ServerPlayer player, int id) {
+        if (discoveries(player).stream().noneMatch(entry -> entry.id() == id)) return false;
+        discoveries.toggleFavorite(id, player.getUUID());
+        discoveries.saveAsync(exportWorker, error -> {
+            InfiniteCraftMod.LOGGER.error("Could not save discovery favorites", error);
+            server.execute(() -> player.sendSystemMessage(Component.literal("Favorites could not be saved.")));
+        });
+        return true;
+    }
     public boolean soulboundBook() {
         return config.soulboundBook;
     }
@@ -382,11 +404,10 @@ public final class FusionRuntime implements AutoCloseable {
         if (config.queueFeedback && ticks % 10 == 0) {
             var notified = new HashSet<UUID>();
             for (var visual : combining.values()) {
-                var queue = engine.queuePosition(visual.recipeKey());
-                if (queue == null || !notified.add(visual.player())) continue;
+                String message = queueMessage(visual.recipeKey());
+                if (message == null || !notified.add(visual.player())) continue;
                 var viewer = server.getPlayerList().getPlayer(visual.player());
-                if (viewer != null) viewer.sendSystemMessage(Component.literal("Fusion queued"
-                        + ".".repeat(1 + (int) ((ticks / 10) % 3)) + " (" + queue.position() + "/" + queue.total() + ")")
+                if (viewer != null) viewer.sendSystemMessage(Component.literal(message)
                         .withStyle(ChatFormatting.GRAY), true);
             }
         }
@@ -489,8 +510,7 @@ public final class FusionRuntime implements AutoCloseable {
                         // Provider bodies and credentials are never echoed into chat or logs.
                         Throwable cause = error;
                         while (cause instanceof CompletionException && cause.getCause() != null) cause = cause.getCause();
-                        deny(world, player, a, b, cause instanceof BlockedRecipeException
-                                ? "Combination blocked." : "Fusion failed. Pick up and drop to retry.");
+                        deny(world, player, a, b, dev.rocks.infinitecraft.engine.GenerationFailure.message(cause));
                         InfiniteCraftMod.LOGGER.warn("Fusion request {} failed: {}", token, cause.getMessage());
                         return;
                     }
@@ -587,9 +607,9 @@ public final class FusionRuntime implements AutoCloseable {
         }
         long requestEpoch = epoch;
         GenerationRequest request = new GenerationRequest(firstId, secondId,
-                needsGeneration ? candidateIndex.candidates(firstId, secondId, config.candidateLimit, compatibleIds) : List.of(),
+                needsGeneration ? candidateIndex.candidates(firstId, secondId, config.candidateLimit, compatibleIds, config.silliness) : List.of(),
                 config.generatedTraits && (ingredientTriggered || server.overworld().getRandom().nextInt(100) < config.specialResultChance)
-                        ? VanillaTraits.ids() : List.of(), effects, config.maxOutputCount, config.power, config.silliness,
+                        ? VanillaTraits.ids().stream().filter(id -> !id.equals("lucky_block") && !config.disabledTraits.contains(id)).toList() : List.of(), effects, config.maxOutputCount, config.power, config.silliness,
                 config.generatedTraits && !PotionFusion.describe(preservedFirst, preservedSecond).isEmpty() ? potionOptions : Map.of(),
                 config.maxTraits, ItemTraits.inherited(preservedFirst, preservedSecond),
                 !config.specialRarity ? 0 : RecipeQuality.fromRarities(

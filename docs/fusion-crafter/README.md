@@ -14,7 +14,7 @@ to retry. The player who last interacted with the station receives discoveries; 
 is used after loading. A player must be online for the station to start.
 
 The Gameplay settings include separate Ground fusion and Fusion Crafter toggles.
-Marked stations never perform ordinary Crafter recipes. Redstone is unnecessary.
+Marked stations never perform ordinary Crafter recipes. Redstone is unnecessary, but each pulse toggles the crafter between running and stopped.
 
 With the mod installed, placed stations use the normal chunk renderer, with block lighting
 and hidden-face culling. Empty stations sleep until their inventory changes.

@@ -31,6 +31,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 
@@ -59,6 +60,12 @@ public final class DiscoveryDialogs {
 
     public static NoticeDialog createDialog(List<DiscoveryCollection.Entry> entries, int requestedPage,
             boolean personal, int itemId, int returnPage, String pageCommandOverride) {
+        return createDialog(entries, requestedPage, personal, itemId, returnPage, pageCommandOverride, Set.of(), false);
+    }
+
+    public static NoticeDialog createDialog(List<DiscoveryCollection.Entry> entries, int requestedPage,
+            boolean personal, int itemId, int returnPage, String pageCommandOverride, Set<Integer> favorites, boolean favoritesOnly) {
+        if (favoritesOnly) entries = entries.stream().filter(entry -> favorites.contains(entry.id())).toList();
         var groups = DiscoveryCollection.groupResults(entries);
         var selected = itemId > 0 ? entries.stream().filter(entry -> entry.id() == itemId).findFirst()
                 : Optional.<DiscoveryCollection.Entry>empty();
@@ -80,6 +87,10 @@ public final class DiscoveryDialogs {
                 .append(pageArrow("<", "Previous page", pageCommand + (page - 1), page > 1))
                 .append(Component.literal("   "))
                 .append(searchButton())
+                .append(Component.literal("   [" + (favoritesOnly ? "★" : "☆") + "]").withStyle(style -> style
+                        .withColor(ChatFormatting.YELLOW)
+                        .withHoverEvent(new HoverEvent.ShowText(Component.literal(favoritesOnly ? "Show all discoveries" : "Show favorites")))
+                        .withClickEvent(new ClickEvent.RunCommand(favoritesOnly ? "/fusion collection 1" : "/fusion collection favorites 1"))))
                 .append(Component.literal("   "))
                 .append(pageArrow(">", "Next page", pageCommand + (page + 1), page < pages)), 320);
         body.add(navigation);
@@ -109,6 +120,11 @@ public final class DiscoveryDialogs {
             if (personal) description.append(Component.literal("[Share]").withStyle(style -> style.withColor(ChatFormatting.GOLD)
                             .withClickEvent(new ClickEvent.RunCommand("/fusion share " + discoveryId))
                             .withHoverEvent(new HoverEvent.ShowText(Component.literal("Share recipe in chat")))));
+            description.append(Component.literal(" [" + (favorites.contains(discoveryId) ? "★" : "☆") + "]")
+                    .withStyle(style -> style.withColor(ChatFormatting.YELLOW)
+                            .withHoverEvent(new HoverEvent.ShowText(Component.literal(favorites.contains(discoveryId) ? "Remove favorite" : "Favorite")))
+                            .withClickEvent(new ClickEvent.RunCommand("/fusion favorite " + discoveryId
+                                    + (favoritesOnly ? " favorites " : " page ") + page))));
             body.add(new ItemBody(ItemStackTemplate.fromNonEmptyStack(displayStack(entry.result())),
                     Optional.of(new PlainMessage(description, 280)), false, true, 32, ROW_HEIGHT));
         }
@@ -211,16 +227,17 @@ public final class DiscoveryDialogs {
 
     public static Component discovererLine(List<String> names, int visibleNames) {
         if (names.isEmpty()) return Component.empty();
+        var ink = ChatFormatting.GRAY; // Dialogs sit on a dark background.
         var line = Component.empty()
-                .append(Component.literal("By ").withStyle(ChatFormatting.DARK_GRAY));
+                .append(Component.literal("By ").withStyle(ink));
         int shown = Math.min(Math.max(1, visibleNames), names.size());
         for (int index = 0; index < shown; index++) {
             if (index > 0) line.append(Component.literal(names.size() == 2 ? " and " : ", ")
-                    .withStyle(ChatFormatting.DARK_GRAY));
+                    .withStyle(ink));
             String name = names.get(index);
             line.append(Component.object(new PlayerSprite(
                     ResolvableProfile.createUnresolved(name), true), Component.empty()))
-                    .append(Component.literal(" " + name).withStyle(ChatFormatting.DARK_GRAY));
+                    .append(Component.literal(" " + name).withStyle(ink));
         }
         if (names.size() > shown) {
             var more = Component.empty();
@@ -233,7 +250,8 @@ public final class DiscoveryDialogs {
             }
             int remaining = names.size() - shown;
             line.append(Component.literal(" and " + remaining + " more").withStyle(style -> style
-                    .withColor(ChatFormatting.AQUA).withHoverEvent(new HoverEvent.ShowText(more))));
+                    .withColor(ChatFormatting.AQUA)
+                    .withHoverEvent(new HoverEvent.ShowText(more))));
         }
         return line;
     }

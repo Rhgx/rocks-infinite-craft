@@ -4,6 +4,8 @@ import dev.rocks.infinitecraft.InfiniteCraftMod;
 import dev.rocks.infinitecraft.ModConfig;
 import dev.rocks.infinitecraft.provider.ProviderConfig;
 import me.shedaniel.clothconfig2.api.ConfigBuilder;
+import me.shedaniel.clothconfig2.api.ConfigCategory;
+import net.minecraft.network.chat.FormattedText;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
@@ -30,18 +32,29 @@ public final class InfiniteCraftConfigScreen {
         var builder = ConfigBuilder.create().setParentScreen(parent).setTitle(Component.literal("Rocks' Infinite Craft").withStyle(ChatFormatting.GOLD));
         var entries = builder.entryBuilder();
         var fields = new ConfigEntries(entries);
-        var gameplay = builder.getOrCreateCategory(Component.literal("Gameplay"));
-        var generation = builder.getOrCreateCategory(Component.literal("Generation"));
-        var effects = builder.getOrCreateCategory(Component.literal("Effects"));
-        var advanced = builder.getOrCreateCategory(Component.literal("Advanced"));
+        // Tabs follow a first-time setup: how fusion plays, where recipes come from, then refinements.
+        var gameplay = category(builder, "Gameplay", "Fusion methods, recipe style and the Discovery Book.");
+        var generation = category(builder, "AI Generation", "The provider and model that write new recipes.");
+        var special = category(builder, "Special Items", "Rare results with traits, and how they chain.");
+        var traits = category(builder, "Traits", "Which traits new recipes may use.");
+        var effects = category(builder, "Feedback", "Particles, sounds and messages.");
+        var advanced = category(builder, "Advanced", "Request limits and performance tuning.");
 
         BookControls books = GameplayConfigEntries.add(gameplay, fields, config);
+        GameplayConfigEntries.addSpecial(special, fields, config);
         EffectsConfigEntries.add(effects, fields, config);
+        TraitConfigEntries.add(traits, entries, config);
         Supplier<ProviderConfig> providerValue = GenerationConfigEntries.add(
                 generation, advanced, entries, fields, config);
 
         builder.setSavingRunnable(() -> save(parent, client, path, config, books, providerValue));
         return builder.build();
+    }
+
+    private static ConfigCategory category(ConfigBuilder builder, String name, String description) {
+        var category = builder.getOrCreateCategory(Component.literal(name));
+        category.setDescription(new FormattedText[]{Component.literal(description)});
+        return category;
     }
 
     private static void save(Screen parent, Minecraft client, Path path, ModConfig config, BookControls books,

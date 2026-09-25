@@ -46,6 +46,7 @@ public final class DiscoveryCollection {
     private final List<Set<UUID>> players = new ArrayList<>();
     private int revision;
     private final Map<ResultKey, List<Entry>> outputs = new LinkedHashMap<>();
+    private final Map<ResultKey, Set<UUID>> favorites = new LinkedHashMap<>();
 
     /** Immediate-parent lore is presentation metadata, so it does not split one result into several outputs. */
     public record ResultKey(ItemStack stack) {
@@ -89,6 +90,7 @@ public final class DiscoveryCollection {
         store = new DiscoveryStore(file, registries);
         for (var stored : store.load()) {
             var entry = stored.entry();
+            favorites.computeIfAbsent(new ResultKey(entry.result()), ignored -> new HashSet<>()).addAll(stored.favorites());
             players.add(new HashSet<>(stored.owners()));
             entries.add(entry);
             outputs.computeIfAbsent(new ResultKey(entry.result()), ignored -> new ArrayList<>()).add(entry);
@@ -232,7 +234,23 @@ public final class DiscoveryCollection {
     }
 
     private String encode(Entry entry, Set<UUID> owners) {
-        return store.encode(entry, owners);
+        return store.encode(entry, owners, favorites.getOrDefault(new ResultKey(entry.result()), Set.of()));
+    }
+
+    public Set<Integer> favoriteIds(UUID player) {
+        var ids = new HashSet<Integer>();
+        for (var entry : entries) {
+            if (favorites.getOrDefault(new ResultKey(entry.result()), Set.of()).contains(player)) ids.add(entry.id());
+        }
+        return Set.copyOf(ids);
+    }
+
+    public void toggleFavorite(int id, UUID player) {
+        if (id < 1 || id > entries.size()) throw new IllegalArgumentException("Unknown discovery");
+        var key = new ResultKey(entries.get(id - 1).result());
+        var starred = favorites.computeIfAbsent(key, ignored -> new HashSet<>());
+        if (!starred.remove(player)) starred.add(player);
+        for (var entry : outputs.get(key)) encoded.set(entry.id() - 1, encode(entry, players.get(entry.id() - 1)));
     }
 
     public static List<Entry> uniqueResults(List<Entry> recipes) {

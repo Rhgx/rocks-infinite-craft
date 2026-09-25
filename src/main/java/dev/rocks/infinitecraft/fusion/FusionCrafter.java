@@ -4,7 +4,6 @@ import dev.rocks.infinitecraft.InfiniteCraftMod;
 import dev.rocks.infinitecraft.discovery.DiscoveryBook;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
-import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -74,13 +73,21 @@ public final class FusionCrafter implements AutoCloseable {
         return preview;
     }
 
+    boolean working(CrafterBlockEntity block) {
+        var station = stations.get(block);
+        return station != null && station.job != null;
+    }
+
     void touch(CrafterBlockEntity block) {
         dirty.add(block);
     }
 
     void trigger(CrafterBlockEntity block) {
+        FusionCrafterBlock.setMode(block, FusionCrafterBlock.repeats(block), false);
         touch(block);
-        stations.computeIfAbsent(block, ignored -> new Station()).triggered = true;
+        var station = stations.computeIfAbsent(block, ignored -> new Station());
+        station.triggered = true;
+        station.attempted = false;
     }
 
     void unload(CrafterBlockEntity block) {
@@ -159,7 +166,8 @@ public final class FusionCrafter implements AutoCloseable {
                 station.attempted = true;
                 InfiniteCraftMod.LOGGER.error("Fusion Crafter at {} failed; items retained", block.getBlockPos(), error);
             }
-            if (!enabled || inputSlots(station.items).isEmpty() || (station.attempted && station.job == null))
+            if (!enabled || inputSlots(station.items).isEmpty() || (station.attempted && station.job == null)
+                    || (FusionCrafterBlock.paused(block) && station.job == null))
                 iterator.remove();
         }
     }
@@ -174,6 +182,7 @@ public final class FusionCrafter implements AutoCloseable {
             return;
         }
         var current = block.getItems();
+        if (FusionCrafterBlock.paused(block) && station.job == null) return;
         if (!sameItems(station.items, current)) {
             cancel(station);
             station.items = current.stream().map(ItemStack::copy).toList();
@@ -230,19 +239,15 @@ public final class FusionCrafter implements AutoCloseable {
                     runtime.recordDiscovery(job.inputFirst(), job.inputSecond(), output, player);
                     feedback(world, block, runtime.isSpecial(output), true);
                     station.user = null;
+                    if (!FusionCrafterBlock.repeats(block)) FusionCrafterBlock.setMode(block, false, true);
                 } catch (CompletionException | IllegalArgumentException error) {
-                    player.sendSystemMessage(Component.literal("Fusion failed. Remove an item to retry."), true);
+                    player.sendSystemMessage(Component.literal(dev.rocks.infinitecraft.engine.GenerationFailure.message(error)), true);
                     feedback(world, block, false, false);
                     InfiniteCraftMod.LOGGER.warn("Fusion Crafter request failed: {}", error.getClass().getSimpleName());
                 }
-            } else if (server.getTickCount() % 4 == 0 && runtime.settings().combiningParticles) {
-                var center = Vec3.atBottomCenterOf(block.getBlockPos()).add(0, 1.2, 0);
-                double angle = server.getTickCount() * .16;
-                for (int side = 0; side < 2; side++) {
-                    double a = angle + side * Math.PI;
-                    FusionEffects.sendParticleOutsideBlocks(world, ParticleTypes.ELECTRIC_SPARK,
-                            center.x + Math.cos(a) * .3, center.y, center.z + Math.sin(a) * .3);
-                }
+            } else if (runtime.settings().combiningParticles) {
+                FusionEffects.showCrafterWorking(world, Vec3.atBottomCenterOf(block.getBlockPos()).add(0, 1, 0),
+                        server.getTickCount());
             }
             return;
         }
@@ -307,10 +312,8 @@ public final class FusionCrafter implements AutoCloseable {
             world.playSound(null, point.x, point.y, point.z,
                     success ? (special ? SoundEvents.NOTE_BLOCK_BELL : SoundEvents.NOTE_BLOCK_CHIME) : SoundEvents.NOTE_BLOCK_DIDGERIDOO,
                     SoundSource.BLOCKS, .25F, success ? 1.3F : .5F);
-        if (success ? config.successParticles : config.failureParticles) {
-            if (success && special) FusionEffects.showSpecialParticles(world, point);
-            else FusionEffects.showResultParticles(world, point, success);
-        }
+        if (success ? config.successParticles : config.failureParticles)
+            FusionEffects.showCrafterResult(world, point, success, special);
     }
 
     @Override

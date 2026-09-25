@@ -36,6 +36,25 @@ public record AttributeTrait(
     }
 
     @Override
+    public String description() {
+        return switch (id) {
+            case "bouncy" -> "Bounce on landing.";
+            case "slippery" -> "Reduce friction.";
+            case "low_gravity" -> "Reduce gravity.";
+            case "tiny" -> "Shrink the wielder.";
+            case "giant" -> "Enlarge the wielder.";
+            case "anchored" -> "Resist knockback.";
+            case "healthy" -> "Increase maximum health.";
+            case "soft_landing" -> "Increase safe falling distance.";
+            case "gilled" -> "Extend underwater breathing.";
+            case "sweeping" -> "Increase sweeping attack damage.";
+            case "water_stride" -> "Move faster underwater.";
+            case "step_up" -> "Step over taller obstacles.";
+            default -> "";
+        };
+    }
+
+    @Override
     public List<String> activationModes() {
         var modes = new ArrayList<>(List.of("auto", "mainhand", "offhand", "head", "chest", "legs", "feet"));
         if (consumedEffect != null) modes.addAll(List.of("consumed", "consumed_brief", "consumed_long", "consumed_intense"));

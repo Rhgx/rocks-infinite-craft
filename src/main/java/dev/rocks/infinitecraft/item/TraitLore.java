@@ -94,6 +94,9 @@ public final class TraitLore {
     private static Component normalizedHint(Component line) {
         Component activation = ACTIVATION_LINES.get(line.getString());
         if (activation != null) return activation;
-        return LINES.values().stream().filter(hint -> hint.getString().equals(line.getString())).findFirst().orElse(null);
+        // Existing discoveries can still carry the same hint without its new glyph.
+        return LINES.values().stream().filter(hint -> hint.getString().equals(line.getString())
+                || hint.getString().endsWith(" " + line.getString()))
+                .findFirst().orElse(null);
     }
 }

@@ -74,7 +74,7 @@ public final class DiscoveryBook {
                 var discoveries = entries.apply(serverPlayer);
                 if (ServerPlayNetworking.canSend(serverPlayer, DiscoveryScreenPayload.TYPE))
                     ServerPlayNetworking.send(serverPlayer,
-                            new DiscoveryScreenPayload(discoveries, InfiniteCraftMod.personalBook()));
+                            new DiscoveryScreenPayload(discoveries, InfiniteCraftMod.personalBook(), InfiniteCraftMod.runtime().favoriteIds(serverPlayer)));
                 else show(serverPlayer, discoveries, 1);
             } catch (RuntimeException error) {
                 InfiniteCraftMod.LOGGER.warn("Could not open discovery collection", error);
@@ -260,7 +260,8 @@ public final class DiscoveryBook {
 
     /** Pages are one-based. Clamp stale page requests if the collection changed since the last view. */
     public static void show(ServerPlayer player, List<DiscoveryCollection.Entry> entries, int page) {
-        player.openDialog(Holder.direct(createDialog(entries, page, InfiniteCraftMod.personalBook())));
+        player.openDialog(Holder.direct(DiscoveryDialogs.createDialog(entries, page, InfiniteCraftMod.personalBook(),
+                0, 1, null, InfiniteCraftMod.runtime().favoriteIds(player), false)));
     }
 
     public static NoticeDialog createDialog(

@@ -51,6 +51,11 @@ public final class HttpRecipeGenerator implements RecipeGenerator {
 
     @Override
     public List<RecipeResult> generateCandidates(GenerationRequest request) throws Exception {
+        return generateCandidates(request, "");
+    }
+
+    @Override
+    public List<RecipeResult> generateCandidates(GenerationRequest request, String feedback) throws Exception {
         if (config.provider().equals("disabled")) throw new IOException("Recipe generation is disabled");
         if (request.candidates().isEmpty()) throw new IOException("No crafting candidates available");
         String key = config.apiKey();
@@ -59,7 +64,7 @@ public final class HttpRecipeGenerator implements RecipeGenerator {
             throw new IOException("Provider API key is missing; enter a key or set its environment variable");
         if (key != null && key.chars().anyMatch(c -> c < 33 || c > 126))
             throw new IOException("Provider API key contains invalid characters");
-        JsonObject body = body(request);
+        JsonObject body = body(request, feedback);
         byte[] encoded = JSON.toJson(body).getBytes(StandardCharsets.UTF_8);
         if (encoded.length > MAX_BODY) throw new IOException("Provider request exceeds size limit");
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(config.baseUrl() + path()))
@@ -89,6 +94,12 @@ public final class HttpRecipeGenerator implements RecipeGenerator {
             throw new IOException("Provider returned HTTP " + response.statusCode());
         try {
             JsonObject envelope = RecipeResponseParser.parseObject(new String(response.body(), StandardCharsets.UTF_8));
+            if (config.provider().equals("ollama")) {
+                org.slf4j.LoggerFactory.getLogger(HttpRecipeGenerator.class).debug(
+                        "Ollama timing: load={} ns, prompt={} ns, output={} ns, promptTokens={}, cachedTokens={}, outputTokens={}",
+                        envelope.get("load_duration"), envelope.get("prompt_eval_duration"), envelope.get("eval_duration"),
+                        envelope.get("prompt_eval_count"), envelope.get("prompt_eval_cached_count"), envelope.get("eval_count"));
+            }
             return RecipeResponseParser.parseCandidates(extract(envelope), request);
         } catch (RuntimeException | IOException e) {
             throw new InvalidRecipeResponseException();
@@ -108,8 +119,8 @@ public final class HttpRecipeGenerator implements RecipeGenerator {
         };
     }
 
-    private JsonObject body(GenerationRequest request) {
-        String prompt = RecipePrompt.build(request);
+    private JsonObject body(GenerationRequest request, String feedback) {
+        String prompt = RecipePrompt.build(request, false, feedback);
         JsonObject body = new JsonObject();
         if (!config.provider().equals("gemini")) body.addProperty("model", config.model());
         switch (config.provider()) {
@@ -127,6 +138,7 @@ public final class HttpRecipeGenerator implements RecipeGenerator {
                 body.add("messages", JSON.toJsonTree(List.of(java.util.Map.of("role", "user", "content", prompt))));
                 if (config.provider().equals("ollama")) {
                     body.addProperty("stream", false);
+                    body.addProperty("keep_alive", -1);
                     // Recipe selection needs a short answer; thinking can exhaust the output budget.
                     body.addProperty("think", false);
                     body.add("format", RecipeSchema.build(request));
