@@ -16,6 +16,7 @@ import dev.rocks.infinitecraft.core.RecipeResult;
 import dev.rocks.infinitecraft.discovery.DiscoveryAnnouncements;
 import dev.rocks.infinitecraft.discovery.DiscoveryBook;
 import dev.rocks.infinitecraft.discovery.DiscoveryCollection;
+import dev.rocks.infinitecraft.discovery.KnownRecipes;
 import dev.rocks.infinitecraft.discovery.SpecialItemsTab;
 import dev.rocks.infinitecraft.engine.BlockedRecipeException;
 import dev.rocks.infinitecraft.engine.GenerationFailure;
@@ -214,6 +215,8 @@ public final class FusionRuntime implements AutoCloseable {
         }
         if (previous.soulboundBook != settings.soulboundBook || previous.enabled != settings.enabled)
             for (var player : server.getPlayerList().getPlayers()) DiscoveryBook.sync(player);
+        if (previous.personalBook != settings.personalBook)
+            for (var player : server.getPlayerList().getPlayers()) KnownRecipes.send(player, discoveries(player), true);
     }
 
     private void cancelExchanges() {
@@ -352,6 +355,9 @@ public final class FusionRuntime implements AutoCloseable {
             discoveries.saveAsync(exportWorker,
                     error -> InfiniteCraftMod.LOGGER.error("Could not save discovery collection", error));
             if (firstDiscovery && isSpecial(output)) SpecialItemsTab.sendAll(server, discoveries.entries());
+            var recipe = discoveries.find(first, second, output);
+            if (recipe != null) for (var viewer : config.personalBook ? List.of(player) : server.getPlayerList().getPlayers())
+                KnownRecipes.send(viewer, List.of(recipe), false);
             if (firstDiscovery && (isSpecial(output) ? config.specialDiscoveryMessage : config.firstDiscoveryMessage)) {
                 var message = DiscoveryAnnouncements.discoveryMessage(output, player.getName().getString(), isSpecial(output));
                 for (var viewer : server.getPlayerList().getPlayers()) viewer.sendSystemMessage(message);

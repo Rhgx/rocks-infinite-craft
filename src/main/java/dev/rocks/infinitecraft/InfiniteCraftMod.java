@@ -3,6 +3,7 @@ package dev.rocks.infinitecraft;
 import dev.rocks.infinitecraft.command.FusionCommands;
 import dev.rocks.infinitecraft.discovery.DiscoveryBook;
 import dev.rocks.infinitecraft.discovery.DiscoveryScreenPayload;
+import dev.rocks.infinitecraft.discovery.KnownRecipes;
 import dev.rocks.infinitecraft.discovery.SpecialItemsTab;
 import dev.rocks.infinitecraft.fusion.CrafterStatePayload;
 import dev.rocks.infinitecraft.fusion.FusionCrafterBlock;
@@ -112,6 +113,7 @@ public final class InfiniteCraftMod implements ModInitializer {
         LuckyBlockTrait.initialize();
         SpecialItemsTab.initialize();
         DiscoveryScreenPayload.initialize();
+        KnownRecipes.initialize();
         CrafterStatePayload.initialize();
         net.fabricmc.fabric.api.event.lifecycle.v1.ServerBlockEntityEvents.BLOCK_ENTITY_LOAD.register((block, world) -> {
             if (block instanceof CrafterBlockEntity crafter) {
@@ -178,6 +180,7 @@ public final class InfiniteCraftMod implements ModInitializer {
             DiscoveryBook.sync(handler.player);
             if (runtime != null) {
                 SpecialItemsTab.send(handler.player, runtime.discoveries());
+                KnownRecipes.send(handler.player, runtime.discoveries(handler.player), true);
                 runtime.welcome(handler.player);
             }
         });

@@ -2,6 +2,7 @@ package dev.rocks.infinitecraft.client;
 
 import com.mojang.math.Quadrant;
 import dev.rocks.infinitecraft.client.discovery.DiscoveryBookClient;
+import dev.rocks.infinitecraft.client.jei.KnownRecipesClient;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.model.loading.v1.ModelLoadingPlugin;
 import net.fabricmc.fabric.api.client.model.loading.v1.wrapper.WrapperBlockStateModel;
@@ -32,6 +33,7 @@ public final class FusionCrafterModels implements ClientModInitializer {
         SpecialItemsTabClient.initialize();
         DiscoveryBookClient.initialize();
         CrafterStateClient.initialize();
+        KnownRecipesClient.initialize();
         ModelLoadingPlugin.register(plugin -> plugin.modifyBlockModelOnLoad().register((original, context) -> {
             if (!context.state().is(Blocks.CRAFTER)) return original;
             var orientation = context.state().getValue(BlockStateProperties.ORIENTATION);

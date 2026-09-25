@@ -20,24 +20,10 @@ public record DiscoveryScreenPayload(List<DiscoveryCollection.Entry> entries, bo
     public static final StreamCodec<RegistryFriendlyByteBuf, DiscoveryScreenPayload> CODEC = new StreamCodec<>() {
         @Override
         public DiscoveryScreenPayload decode(RegistryFriendlyByteBuf buffer) {
-            int size = buffer.readVarInt();
-            if (size < 0 || size > 100_000) throw new IllegalArgumentException("Invalid discovery count");
-            var entries = new ArrayList<DiscoveryCollection.Entry>(size);
-            for (int i = 0; i < size; i++) {
-                var first = ItemStack.STREAM_CODEC.decode(buffer);
-                var second = ItemStack.STREAM_CODEC.decode(buffer);
-                var result = ItemStack.STREAM_CODEC.decode(buffer);
-                String discoverer = buffer.readUtf(64);
-                int id = buffer.readVarInt();
-                int names = buffer.readVarInt();
-                if (names < 0 || names > 1_000) throw new IllegalArgumentException("Invalid discoverer count");
-                var discoverers = new ArrayList<String>(names);
-                for (int name = 0; name < names; name++) discoverers.add(buffer.readUtf(64));
-                entries.add(new DiscoveryCollection.Entry(first, second, result, discoverer, id, discoverers));
-            }
+            var entries = readEntries(buffer);
             boolean personal = buffer.readBoolean();
             int count = buffer.readVarInt();
-            if (count < 0 || count > size) throw new IllegalArgumentException("Invalid favorite count");
+            if (count < 0 || count > entries.size()) throw new IllegalArgumentException("Invalid favorite count");
             var favorites = new HashSet<Integer>();
             for (int i = 0; i < count; i++) favorites.add(buffer.readVarInt());
             return new DiscoveryScreenPayload(entries, personal, favorites);
@@ -45,16 +31,7 @@ public record DiscoveryScreenPayload(List<DiscoveryCollection.Entry> entries, bo
 
         @Override
         public void encode(RegistryFriendlyByteBuf buffer, DiscoveryScreenPayload payload) {
-            buffer.writeVarInt(payload.entries.size());
-            for (var entry : payload.entries) {
-                ItemStack.STREAM_CODEC.encode(buffer, entry.first());
-                ItemStack.STREAM_CODEC.encode(buffer, entry.second());
-                ItemStack.STREAM_CODEC.encode(buffer, entry.result());
-                buffer.writeUtf(entry.discoverer(), 64);
-                buffer.writeVarInt(entry.id());
-                buffer.writeVarInt(entry.discoverers().size());
-                entry.discoverers().forEach(name -> buffer.writeUtf(name, 64));
-            }
+            writeEntries(buffer, payload.entries);
             buffer.writeBoolean(payload.personal);
             buffer.writeVarInt(payload.favorites.size());
             payload.favorites.forEach(buffer::writeVarInt);
@@ -64,6 +41,38 @@ public record DiscoveryScreenPayload(List<DiscoveryCollection.Entry> entries, bo
     public DiscoveryScreenPayload {
         entries = List.copyOf(entries);
         favorites = Set.copyOf(favorites);
+    }
+
+    static List<DiscoveryCollection.Entry> readEntries(RegistryFriendlyByteBuf buffer) {
+        int size = buffer.readVarInt();
+        if (size < 0 || size > 100_000) throw new IllegalArgumentException("Invalid discovery count");
+        var entries = new ArrayList<DiscoveryCollection.Entry>(size);
+        for (int i = 0; i < size; i++) {
+            var first = ItemStack.STREAM_CODEC.decode(buffer);
+            var second = ItemStack.STREAM_CODEC.decode(buffer);
+            var result = ItemStack.STREAM_CODEC.decode(buffer);
+            String discoverer = buffer.readUtf(64);
+            int id = buffer.readVarInt();
+            int names = buffer.readVarInt();
+            if (names < 0 || names > 1_000) throw new IllegalArgumentException("Invalid discoverer count");
+            var discoverers = new ArrayList<String>(names);
+            for (int name = 0; name < names; name++) discoverers.add(buffer.readUtf(64));
+            entries.add(new DiscoveryCollection.Entry(first, second, result, discoverer, id, discoverers));
+        }
+        return entries;
+    }
+
+    static void writeEntries(RegistryFriendlyByteBuf buffer, List<DiscoveryCollection.Entry> entries) {
+        buffer.writeVarInt(entries.size());
+        for (var entry : entries) {
+            ItemStack.STREAM_CODEC.encode(buffer, entry.first());
+            ItemStack.STREAM_CODEC.encode(buffer, entry.second());
+            ItemStack.STREAM_CODEC.encode(buffer, entry.result());
+            buffer.writeUtf(entry.discoverer(), 64);
+            buffer.writeVarInt(entry.id());
+            buffer.writeVarInt(entry.discoverers().size());
+            entry.discoverers().forEach(name -> buffer.writeUtf(name, 64));
+        }
     }
 
     public static void initialize() {

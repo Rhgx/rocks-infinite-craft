@@ -206,6 +206,13 @@ public final class DiscoveryCollection {
         return newOutput;
     }
 
+    /** The recorded recipe for this pair and output, in either input order, or null. */
+    public Entry find(ItemStack first, ItemStack second, ItemStack output) {
+        for (var entry : outputs.getOrDefault(new ResultKey(output), List.of()))
+            if (samePair(entry.first(), entry.second(), first, second)) return entry;
+        return null;
+    }
+
     public static boolean samePair(ItemStack first, ItemStack second, ItemStack otherFirst, ItemStack otherSecond) {
         var firstKey = new ResultKey(first);
         var secondKey = new ResultKey(second);
