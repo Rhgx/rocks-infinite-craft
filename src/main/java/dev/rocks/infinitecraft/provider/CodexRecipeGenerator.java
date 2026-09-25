@@ -220,7 +220,16 @@ public final class CodexRecipeGenerator implements RecipeGenerator {
         boolean windows = System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("win");
         String searchPath = System.getenv("PATH");
         // PATH uses the platform separator, semicolon on Windows and colon on Unix-like systems.
-        for (String directory : (searchPath == null ? "" : searchPath).split(java.io.File.pathSeparator)) {
+        var directories = new ArrayList<>(List.of((searchPath == null ? "" : searchPath).split(java.io.File.pathSeparator)));
+        // Launchers started from a desktop session can miss the user PATH, so also try the usual install folders.
+        if (windows) {
+            String appData = System.getenv("APPDATA");
+            if (appData != null) directories.add(Path.of(appData, "npm").toString());
+        } else {
+            directories.addAll(List.of("/opt/homebrew/bin", "/usr/local/bin",
+                    Path.of(System.getProperty("user.home"), ".local", "bin").toString()));
+        }
+        for (String directory : directories) {
             if (directory.isBlank()) continue;
             Path base = Path.of(directory.replace("\"", ""));
             Path direct = base.resolve(windows ? "codex.exe" : "codex");
