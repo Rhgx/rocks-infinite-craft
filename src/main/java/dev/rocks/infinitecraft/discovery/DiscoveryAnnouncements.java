@@ -15,10 +15,10 @@ public final class DiscoveryAnnouncements {
 
     public static Component discoveryMessage(ItemStack output, String discoverer, boolean special) {
         return Component.empty()
-                .append(Component.literal(special ? "[SPECIAL] " : "[FIRST] ")
+                .append(Component.literal(special ? "✧ " : "✦ ")
                         .withStyle(style -> style.withColor(special ? ChatFormatting.LIGHT_PURPLE : ChatFormatting.GOLD).withBold(true)))
-                .append(Component.literal(discoverer).withStyle(ChatFormatting.GRAY))
-                .append(Component.literal(" found ").withStyle(ChatFormatting.GRAY))
+                .append(Component.literal(discoverer).withStyle(ChatFormatting.WHITE))
+                .append(Component.literal(" discovered ").withStyle(ChatFormatting.GRAY))
                 .append(output.getDisplayName());
     }
 
@@ -48,9 +48,11 @@ public final class DiscoveryAnnouncements {
         var textColor = tier >= 6 ? ChatFormatting.GOLD
                 : tier >= 4 ? ChatFormatting.YELLOW : ChatFormatting.GRAY;
         boolean bold = tier >= 6;
-        return Component.literal(discoverer + " reached ").withStyle(style -> style.withColor(textColor).withBold(bold))
-                .append(Component.literal(Integer.toString(count)).withStyle(style -> style.withColor(numberColor).withBold(true)))
-                .append(Component.literal(" discoveries!").withStyle(style -> style.withColor(textColor).withBold(bold)));
+        // The count is the world total; kept short so the finder's XP suffix fits on one chat line.
+        return Component.literal("★ Discovery ").withStyle(style -> style.withColor(textColor).withBold(bold))
+                .append(Component.literal("#" + count).withStyle(style -> style.withColor(numberColor).withBold(true)))
+                .append(Component.literal(" by " + discoverer).withStyle(style -> style
+                        .withColor(ChatFormatting.GRAY).withBold(false)));
     }
 
 }

@@ -10,28 +10,8 @@ public final class FusionEffects {
     private FusionEffects() {
     }
 
-    public static void showSpecialParticles(ServerLevel world, Vec3 center) {
-        for (int i = 0; i < 8; i++) {
-            double angle = i * Math.PI / 2;
-            sendParticleOutsideBlocks(world, i % 2 == 0 ? ParticleTypes.WITCH : ParticleTypes.END_ROD,
-                    center.x + Math.cos(angle) * .3, center.y + .4 + i * .08,
-                    center.z + Math.sin(angle) * .3);
-        }
-    }
-
-    public static void showResultParticles(ServerLevel world, Vec3 center, boolean success) {
-        // Different native textures and motion distinguish outcomes without colored dust.
-        var particle = success ? ParticleTypes.HAPPY_VILLAGER : ParticleTypes.SMOKE;
-        int count = success ? 4 : 3;
-        for (int i = 0; i < count; i++) {
-            double angle = 2 * Math.PI * i / count;
-            sendParticleOutsideBlocks(world, particle, center.x + Math.cos(angle) * .2,
-                    center.y + .5 + (success ? (i % 2) * .15 : 0), center.z + Math.sin(angle) * .2);
-        }
-    }
-
-    /** Two sparks orbit above a working crafter while enchant glyphs are drawn into its top face. */
-    public static void showCrafterWorking(ServerLevel world, Vec3 top, int tick) {
+    /** Two sparks orbit a working fusion (crafter top or dropped pair) while enchant glyphs are drawn into it. */
+    public static void showWorking(ServerLevel world, Vec3 top, long tick) {
         if (tick % 4 == 0) {
             for (int side = 0; side < 2; side++) {
                 double angle = tick * .16 + side * Math.PI;
@@ -47,7 +27,7 @@ public final class FusionEffects {
         }
     }
 
-    public static void showCrafterResult(ServerLevel world, Vec3 top, boolean success, boolean special) {
+    public static void showResult(ServerLevel world, Vec3 top, boolean success, boolean special) {
         if (!success) {
             // The machine chokes: smoke spills off the top and a storm cloud hangs over it.
             for (int i = 0; i < 6; i++) {

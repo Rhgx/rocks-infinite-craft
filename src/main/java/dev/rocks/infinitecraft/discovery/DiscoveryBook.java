@@ -78,7 +78,7 @@ public final class DiscoveryBook {
                 else show(serverPlayer, discoveries, 1);
             } catch (RuntimeException error) {
                 InfiniteCraftMod.LOGGER.warn("Could not open discovery collection", error);
-                serverPlayer.sendSystemMessage(Component.literal("Could not open collection."));
+                serverPlayer.sendSystemMessage(Component.literal("Could not open collection.").withStyle(ChatFormatting.RED));
             } finally {
                 // An unmodified client predicts knowledge-book consumption. Restore the authoritative inventory.
                 serverPlayer.inventoryMenu.sendAllDataToRemote();

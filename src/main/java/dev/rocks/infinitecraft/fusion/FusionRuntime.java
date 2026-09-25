@@ -31,11 +31,11 @@ import dev.rocks.infinitecraft.item.VanillaTraits;
 import dev.rocks.infinitecraft.provider.RecipeGenerators;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
-import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.protocol.common.ClientboundClearDialogPacket;
 import net.minecraft.network.protocol.game.ClientboundSoundPacket;
 import net.minecraft.resources.Identifier;
@@ -292,16 +292,22 @@ public final class FusionRuntime implements AutoCloseable {
     public void welcome(ServerPlayer player) {
         if (!config.enabled || !config.joinMessage) return;
         if (enabled() || !FusionCommands.canControlFusion(player.createCommandSourceStack())) {
-            player.sendSystemMessage(Component.literal("Infinite Craft: fusion is " + (enabled() ? "on." : "off."))
-                    .withStyle(ChatFormatting.GRAY));
+            player.sendSystemMessage(fusionStatus());
             return;
         }
-        player.sendSystemMessage(Component.literal("Infinite Craft: fusion is off. ").withStyle(ChatFormatting.GRAY)
+        player.sendSystemMessage(fusionStatus().append(" ")
                 .append(Component.literal("[Enable fusion]").withStyle(style -> style.withColor(ChatFormatting.GREEN)
                         .withUnderlined(true)
                         .withHoverEvent(new HoverEvent.ShowText(
                                 Component.literal("/fusion enable").withStyle(ChatFormatting.GRAY)))
                         .withClickEvent(new ClickEvent.RunCommand("/fusion enable")))));
+    }
+
+    private MutableComponent fusionStatus() {
+        return Component.literal("Infinite Craft").withStyle(ChatFormatting.GOLD)
+                .append(Component.literal(" · fusion is ").withStyle(ChatFormatting.GRAY))
+                .append(enabled() ? Component.literal("on").withStyle(ChatFormatting.GREEN)
+                        : Component.literal("off").withStyle(ChatFormatting.RED));
     }
 
     public List<DiscoveryCollection.Entry> discoveries() {
@@ -320,7 +326,7 @@ public final class FusionRuntime implements AutoCloseable {
         discoveries.toggleFavorite(id, player.getUUID());
         discoveries.saveAsync(exportWorker, error -> {
             InfiniteCraftMod.LOGGER.error("Could not save discovery favorites", error);
-            server.execute(() -> player.sendSystemMessage(Component.literal("Favorites could not be saved.")));
+            server.execute(() -> player.sendSystemMessage(Component.literal("Favorites could not be saved.").withStyle(ChatFormatting.RED)));
         });
         return true;
     }
@@ -349,7 +355,7 @@ public final class FusionRuntime implements AutoCloseable {
                 var milestone = DiscoveryAnnouncements.milestoneMessage(discoveryCount, milestoneTier, player.getName().getString());
                 for (var viewer : server.getPlayerList().getPlayers()) viewer.sendSystemMessage(viewer == player
                         ? milestone.copy().append(Component.literal("  +" + experience + " XP")
-                                .withStyle(ChatFormatting.GRAY))
+                                .withStyle(style -> style.withColor(0x80FF20).withBold(false)))
                         : milestone);
             }
             discoveries.saveAsync(exportWorker,
@@ -378,9 +384,12 @@ public final class FusionRuntime implements AutoCloseable {
         if (ticks - lastRecipeShare.getOrDefault(player.getUUID(), -100L) < 60) return 0;
         lastRecipeShare.put(player.getUUID(), ticks);
         var entry = entries.get(id - 1);
-        var message = Component.literal(player.getName().getString() + ": ").withStyle(ChatFormatting.GRAY)
-                .append(entry.first().getDisplayName()).append(" + ")
-                .append(entry.second().getDisplayName()).append(" = ").append(entry.result().getDisplayName());
+        var message = Component.literal("✎ ").withStyle(ChatFormatting.AQUA)
+                .append(Component.literal(player.getName().getString()).withStyle(ChatFormatting.WHITE))
+                .append(Component.literal(" shared a recipe: ").withStyle(ChatFormatting.GRAY))
+                .append(entry.first().getDisplayName()).append(Component.literal(" + ").withStyle(ChatFormatting.GRAY))
+                .append(entry.second().getDisplayName()).append(Component.literal(" = ").withStyle(ChatFormatting.GRAY))
+                .append(entry.result().getDisplayName());
         for (var viewer : server.getPlayerList().getPlayers()) viewer.sendSystemMessage(message);
         return 1;
     }
@@ -407,7 +416,7 @@ public final class FusionRuntime implements AutoCloseable {
         if (!enabled()) return;
         ticks++;
         cancelAbandonedExchanges();
-        if (config.combiningParticles && ticks % 2 == 0) showCombiningParticles();
+        if (config.combiningParticles) showCombiningParticles();
         if (config.queueFeedback && ticks % 10 == 0) {
             var notified = new HashSet<UUID>();
             for (var visual : combining.values()) {
@@ -681,17 +690,7 @@ public final class FusionRuntime implements AutoCloseable {
             if (!(visual.world().getEntity(visual.first()) instanceof ItemEntity a)
                     || !(visual.world().getEntity(visual.second()) instanceof ItemEntity b)
                     || a.isRemoved() || b.isRemoved() || a.distanceToSqr(b) > .64 || a.distanceToSqr(player) > 100) continue;
-            var center = a.position().add(b.position()).scale(.5);
-            // Both trails orbit the same midpoint, always opposite one another.
-            double radius = .24 + .04 * Math.sin(ticks * .08);
-            for (int side = 0; side < 2; side++) {
-                for (int trail = 0; trail < 2; trail++) {
-                    double angle = (ticks - trail * 2) * .16 + side * Math.PI;
-                    FusionEffects.sendParticleOutsideBlocks(visual.world(), ParticleTypes.ELECTRIC_SPARK,
-                            center.x + Math.cos(angle) * radius, center.y + .5 + Math.sin(angle * 2) * .08,
-                            center.z + Math.sin(angle) * radius);
-                }
-            }
+            FusionEffects.showWorking(visual.world(), a.position().add(b.position()).scale(.5), ticks);
         }
     }
 
@@ -748,10 +747,7 @@ public final class FusionRuntime implements AutoCloseable {
             if (config.successSound) world.playSound(null, midpoint.x, midpoint.y, midpoint.z,
                     special ? SoundEvents.NOTE_BLOCK_BELL : SoundEvents.NOTE_BLOCK_CHIME,
                     SoundSource.PLAYERS, .25F, special ? 1.1F : 1.5F);
-            if (config.successParticles) {
-                if (special) FusionEffects.showSpecialParticles(world, midpoint);
-                else FusionEffects.showResultParticles(world, midpoint, true);
-            }
+            if (config.successParticles) FusionEffects.showResult(world, midpoint, true, special);
         } catch (RuntimeException cosmeticFailure) {
             InfiniteCraftMod.LOGGER.warn("Fusion completed but success effects could not be sent", cosmeticFailure);
         }
@@ -764,9 +760,9 @@ public final class FusionRuntime implements AutoCloseable {
                 || a.isRemoved() || b.isRemoved() || world.getEntity(a.getUUID()) != a
                 || world.getEntity(b.getUUID()) != b || a.distanceToSqr(b) > .64) return;
         var point = a.position().add(b.position()).scale(.5);
-        player.sendSystemMessage(Component.literal(message), true);
+        player.sendSystemMessage(Component.literal(message).withStyle(ChatFormatting.RED), true);
         try {
-            if (config.failureParticles) FusionEffects.showResultParticles(world, point, false);
+            if (config.failureParticles) FusionEffects.showResult(world, point, false, false);
             if (config.failureSound) world.playSound(null, point.x, point.y, point.z,
                     SoundEvents.NOTE_BLOCK_DIDGERIDOO, SoundSource.PLAYERS, .25F, .5F);
         } catch (RuntimeException cosmeticFailure) {

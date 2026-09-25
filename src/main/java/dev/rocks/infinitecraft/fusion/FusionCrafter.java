@@ -242,12 +242,12 @@ public final class FusionCrafter implements AutoCloseable {
                     station.user = null;
                     if (!FusionCrafterBlock.repeats(block)) FusionCrafterBlock.setMode(block, false, true);
                 } catch (CompletionException | IllegalArgumentException error) {
-                    player.sendSystemMessage(Component.literal(GenerationFailure.message(error)), true);
+                    player.sendSystemMessage(Component.literal(GenerationFailure.message(error)).withStyle(ChatFormatting.RED), true);
                     feedback(world, block, false, false);
                     InfiniteCraftMod.LOGGER.warn("Fusion Crafter request failed: {}", error.getClass().getSimpleName());
                 }
             } else if (runtime.settings().combiningParticles) {
-                FusionEffects.showCrafterWorking(world, Vec3.atBottomCenterOf(block.getBlockPos()).add(0, 1, 0),
+                FusionEffects.showWorking(world, Vec3.atBottomCenterOf(block.getBlockPos()).add(0, 1, 0),
                         server.getTickCount());
             }
             return;
@@ -264,7 +264,7 @@ public final class FusionCrafter implements AutoCloseable {
                 throw new IllegalArgumentException("Discovery Books cannot fuse.");
             station.job = runtime.prepareFusion(first.copyWithCount(1), second.copyWithCount(1));
         } catch (IllegalArgumentException error) {
-            player.sendSystemMessage(Component.literal(error.getMessage()), true);
+            player.sendSystemMessage(Component.literal(error.getMessage()).withStyle(ChatFormatting.RED), true);
             feedback(world, block, false, false);
         }
     }
@@ -314,7 +314,7 @@ public final class FusionCrafter implements AutoCloseable {
                     success ? (special ? SoundEvents.NOTE_BLOCK_BELL : SoundEvents.NOTE_BLOCK_CHIME) : SoundEvents.NOTE_BLOCK_DIDGERIDOO,
                     SoundSource.BLOCKS, .25F, success ? 1.3F : .5F);
         if (success ? config.successParticles : config.failureParticles)
-            FusionEffects.showCrafterResult(world, point, success, special);
+            FusionEffects.showResult(world, point, success, special);
     }
 
     @Override
