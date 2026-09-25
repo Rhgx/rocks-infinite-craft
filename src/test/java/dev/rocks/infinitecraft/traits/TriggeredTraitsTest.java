@@ -50,7 +50,7 @@ class TriggeredTraitsTest {
     void starThemeLoopsInTimeAndStaysInNoteBlockRange() {
         SharedConstants.tryDetectVersion();
         Bootstrap.bootStrap();
-        assertEquals(48, LuckyBlockEffects.STAR_THEME.size());
+        assertEquals(64, LuckyBlockEffects.STAR_THEME.size());
         int notes = 0;
         for (var tick : LuckyBlockEffects.STAR_THEME) {
             for (var note : tick) {

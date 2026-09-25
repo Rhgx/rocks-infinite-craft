@@ -47,7 +47,7 @@ final class LuckyBlockEffects {
         int[] fills = {62, 60}; // D4, then C4
         int[][] bass = {{38, 45, 50, 45, 50}, {36, 43, 48, 43, 48}}; // D2 A2 D3 A2 D3, then C2 G2 C3 G2 C3
         var ticks = new ArrayList<List<Note>>();
-        for (int tick = 0; tick < 48; tick++) ticks.add(new ArrayList<>());
+        for (int tick = 0; tick < 64; tick++) ticks.add(new ArrayList<>());
         for (int bar = 0; bar < 2; bar++) {
             int offset = bar * 16;
             for (int step : chordSteps) for (int note : chords[bar]) add(ticks, offset + step, SoundEvents.NOTE_BLOCK_BIT, note, 66);
@@ -57,9 +57,9 @@ final class LuckyBlockEffects {
         return ticks.stream().map(List::copyOf).toList();
     }
 
-    /** A sixteenth note lasts 1.5 ticks; each instrument plays its base note (F#4 or F#2) at pitch 1. */
+    /** At 150 BPM a sixteenth note lasts exactly 2 ticks; each instrument plays its base note (F#4 or F#2) at pitch 1. */
     private static void add(List<List<Note>> ticks, int step, Holder<SoundEvent> sound, int note, int base) {
-        ticks.get(step * 3 / 2).add(new Note(sound, (float) Math.pow(2, (note - base) / 12.0)));
+        ticks.get(step * 2).add(new Note(sound, (float) Math.pow(2, (note - base) / 12.0)));
     }
 
     private static final class Glow {
