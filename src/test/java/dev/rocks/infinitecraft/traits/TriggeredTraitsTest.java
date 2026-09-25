@@ -4,6 +4,8 @@ import dev.rocks.infinitecraft.core.PairKey;
 import dev.rocks.infinitecraft.fusion.FusionCount;
 import dev.rocks.infinitecraft.item.ItemTraits;
 import dev.rocks.infinitecraft.item.VanillaTraits;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.TextColor;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -33,15 +35,47 @@ class TriggeredTraitsTest {
         assertFalse(LuckyBlockTrait.coolingDown(20, 1000));
     }
     @Test
+    void luckyMessagesUseRainbowAndDarkRed() {
+        var rainbow = LuckyBlockTrait.message(0, "♦ Immortal!");
+        assertEquals("♦ Immortal!", rainbow.getString());
+        var colors = rainbow.getSiblings().stream().filter(part -> !part.getString().isBlank())
+                .map(part -> part.getStyle().getColor()).toList();
+        assertEquals(10, colors.size());
+        for (int i = 1; i < colors.size(); i++) assertNotEquals(colors.get(i - 1), colors.get(i));
+        assertEquals(TextColor.fromLegacyFormat(ChatFormatting.DARK_RED),
+                LuckyBlockTrait.message(1, "Unlucky.").getStyle().getColor());
+    }
+
+    @Test
+    void starThemeLoopsInTimeAndStaysInNoteBlockRange() {
+        SharedConstants.tryDetectVersion();
+        Bootstrap.bootStrap();
+        assertEquals(48, LuckyBlockEffects.STAR_THEME.size());
+        int notes = 0;
+        for (var tick : LuckyBlockEffects.STAR_THEME) {
+            for (var note : tick) {
+                notes++;
+                assertTrue(note.pitch() >= 0.5f && note.pitch() <= 2.0f, "pitch " + note.pitch());
+            }
+        }
+        // Per bar: seven three-note chords, three fill notes and five bass notes.
+        assertEquals(2 * (7 * 3 + 3 + 5), notes);
+    }
+
+    @Test
     void luckyRollsAreStableAndCoverThirteenOutcomes() {
         var outcomes = new HashSet<Integer>();
         for (int roll = 0; roll < 100; roll++) outcomes.add(LuckyBlockTrait.outcome(roll));
         assertEquals(13, outcomes.size());
         assertEquals(12, LuckyBlockTrait.outcome(99));
         assertEquals(0, LuckyBlockTrait.outcome(0));
-        assertEquals(0, LuckyBlockTrait.outcome(1));
-        assertEquals(1, LuckyBlockTrait.outcome(2));
-        assertEquals(1, LuckyBlockTrait.outcome(3));
+        assertEquals(0, LuckyBlockTrait.outcome(3));
+        assertEquals(1, LuckyBlockTrait.outcome(4));
+        assertEquals(1, LuckyBlockTrait.outcome(7));
+        assertEquals(2, LuckyBlockTrait.outcome(8));
+        var counts = new int[13];
+        for (int roll = 0; roll < 100; roll++) counts[LuckyBlockTrait.outcome(roll)]++;
+        for (int outcome = 2; outcome < 13; outcome++) assertTrue(counts[outcome] >= 8 && counts[outcome] <= 9);
         String pair = PairKey.of("minecraft:stone", "minecraft:dirt");
         assertEquals(LuckyBlockTrait.appears(pair, 17), LuckyBlockTrait.appears(
                 PairKey.of("minecraft:dirt", "minecraft:stone"), 17));
