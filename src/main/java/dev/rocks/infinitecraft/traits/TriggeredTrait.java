@@ -17,6 +17,7 @@ record TriggeredTrait(String id, String hint, int hintColor) implements TraitDef
         return switch (id) {
             case "explosive" -> .1F;
             case "thundering" -> .05F;
+            case "launching" -> .3F;
             case "self_repairing", "auto_smelt", "vein_miner" -> -1;
             default -> 1;
         };
@@ -27,7 +28,7 @@ record TriggeredTrait(String id, String hint, int hintColor) implements TraitDef
             case "explosive" -> "Melee or projectile hits can cause an explosion that spares the wielder.";
             case "incendiary" -> "Melee or projectile hits ignite the target.";
             case "vampiric" -> "Melee or projectile damage heals the wielder; zero-damage hits do not heal.";
-            case "launching" -> "Melee or projectile hits briefly levitate the target.";
+            case "launching" -> "Melee or projectile hits lift the target about 6 blocks on a short updraft.";
             case "frostbite" -> "Melee or projectile hits briefly slow the target.";
             case "revealing" -> "Melee or projectile hits make the target glow through walls.";
             case "magnetic" -> "Melee or projectile hits pull the target toward the wielder.";

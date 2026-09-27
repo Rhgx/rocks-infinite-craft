@@ -2,6 +2,7 @@ package dev.rocks.infinitecraft.traits;
 
 import dev.rocks.infinitecraft.item.ItemTraits;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -33,6 +34,9 @@ import java.util.WeakHashMap;
 public final class CombatTraits {
     private static final int DAMAGE_WINDOW_TICKS = 400;
     private static final Map<ServerPlayer, CombatHistory> HISTORY = new WeakHashMap<>();
+    /** Launched entities and how many ticks their thrust has run. */
+    private static final Map<LivingEntity, Integer> ROCKETS = new WeakHashMap<>();
+    private static final int THRUST_TICKS = 5;
     private static boolean applyingAreaDamage;
 
     private record Hit(int tick, float damage) {
@@ -49,6 +53,7 @@ public final class CombatTraits {
 
     public static void initialize() {
         ServerLivingEntityEvents.AFTER_DAMAGE.register(CombatTraits::afterDamage);
+        ServerTickEvents.END_SERVER_TICK.register(server -> ROCKETS.entrySet().removeIf(entry -> !thrust(entry)));
         ServerLivingEntityEvents.AFTER_DEATH.register((target, source) ->
                 applyTraits(target, source, Math.min(target.getMaxHealth(), 8)));
     }
@@ -86,8 +91,7 @@ public final class CombatTraits {
         if (traits.contains("incendiary") && level.getRandom().nextFloat() < TraitSettings.chance("incendiary")) target.igniteForSeconds(4);
         if (traits.contains("vampiric") && level.getRandom().nextFloat() < TraitSettings.chance("vampiric")) heal(level, attacker, damage);
         if (target.isAlive()) {
-            if (traits.contains("launching") && level.getRandom().nextFloat() < TraitSettings.chance("launching")) target.addEffect(new MobEffectInstance(
-                    MobEffects.LEVITATION, 20, 0), attacker);
+            if (traits.contains("launching") && level.getRandom().nextFloat() < TraitSettings.chance("launching")) launch(level, target);
             if (traits.contains("frostbite") && level.getRandom().nextFloat() < TraitSettings.chance("frostbite")) target.addEffect(new MobEffectInstance(
                     MobEffects.SLOWNESS, 60, 0), attacker);
             if (traits.contains("revealing") && level.getRandom().nextFloat() < TraitSettings.chance("revealing")) target.addEffect(new MobEffectInstance(
@@ -140,6 +144,27 @@ public final class CombatTraits {
 
     static float healingAmount(float damage, float missingHealth) {
         return damage <= 0 ? 0 : Math.min(missingHealth, Math.clamp(damage * 0.25F, 1, 4));
+    }
+
+    private static void launch(ServerLevel level, LivingEntity target) {
+        if (ROCKETS.putIfAbsent(target, 0) != null) return;
+        level.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.BREEZE_JUMP,
+                SoundSource.PLAYERS, .8F, 1.1F);
+        level.sendParticles(ParticleTypes.SMALL_GUST, target.getX(), target.getY(), target.getZ(), 1, 0, 0, 0, 0);
+    }
+
+    /** A short updraft that builds each tick, lifting the target about 6 blocks before it coasts and falls. */
+    private static boolean thrust(Map.Entry<LivingEntity, Integer> rocket) {
+        var target = rocket.getKey();
+        int age = rocket.getValue();
+        if (!target.isAlive() || !(target.level() instanceof ServerLevel level)) return false;
+        if (age >= THRUST_TICKS) return false;
+        var motion = target.getDeltaMovement();
+        target.setDeltaMovement(motion.x * .6, Math.max(motion.y, .55 + age * .05), motion.z * .6);
+        target.hurtMarked = true;
+        level.sendParticles(ParticleTypes.CLOUD, target.getX(), target.getY(), target.getZ(), 1, .1, .02, .1, .01);
+        rocket.setValue(age + 1);
+        return true;
     }
 
     private static void pull(LivingEntity target, LivingEntity attacker) {
