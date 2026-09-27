@@ -75,11 +75,13 @@ final class TraitConfigEntries {
             case "airy_food" -> "Airy";
             case "hearty_food" -> "Hearty";
             case "vanishing_food" -> "Vanishing";
-            case "edible_healing" -> "Healing food";
-            case "edible_teleport" -> "Teleporting food";
+            case "edible_healing" -> "Healing Food";
+            case "edible_teleport" -> "Teleporting Food";
             default -> {
-                String words = trait.id().replace('_', ' ');
-                yield Character.toUpperCase(words.charAt(0)) + words.substring(1);
+                var words = new StringBuilder();
+                for (String word : trait.id().split("_"))
+                    words.append(words.isEmpty() ? "" : " ").append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
+                yield words.toString();
             }
         };
     }
