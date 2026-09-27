@@ -11,6 +11,8 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.ItemSupplier;
@@ -39,6 +41,7 @@ public final class CombatTraits {
     private static final class CombatHistory {
         final Deque<Hit> hits = new ArrayDeque<>();
         int lastExplosionTick = -1;
+        int lastThunderTick = -1;
     }
 
     private CombatTraits() {
@@ -89,6 +92,7 @@ public final class CombatTraits {
                     MobEffects.SLOWNESS, 60, 0), attacker);
             if (traits.contains("revealing") && level.getRandom().nextFloat() < TraitSettings.chance("revealing")) target.addEffect(new MobEffectInstance(
                     MobEffects.GLOWING, 100, 0), attacker);
+            if (traits.contains("magnetic") && level.getRandom().nextFloat() < TraitSettings.chance("magnetic")) pull(target, attacker);
         }
 
         int tick = level.getServer().getTickCount();
@@ -98,10 +102,17 @@ public final class CombatTraits {
             history.hits.removeFirst();
         }
         float recentDamage = (float) history.hits.stream().mapToDouble(Hit::damage).sum();
+        // Explosive and thundering share one curve: their base chance, up to five times after heavy damage.
+        float surge = explosionChance(recentDamage) / .1F;
         if (traits.contains("explosive") && history.lastExplosionTick != tick
-                && level.getRandom().nextFloat() < Math.min(1, explosionChance(recentDamage) * TraitSettings.chance("explosive") / .1F)) {
+                && level.getRandom().nextFloat() < surge * TraitSettings.chance("explosive")) {
             history.lastExplosionTick = tick;
             explode(level, attacker, target);
+        }
+        if (traits.contains("thundering") && target.isAlive() && history.lastThunderTick != tick
+                && level.getRandom().nextFloat() < surge * TraitSettings.chance("thundering")) {
+            history.lastThunderTick = tick;
+            strike(level, attacker, target);
         }
     }
 
@@ -129,6 +140,25 @@ public final class CombatTraits {
 
     static float healingAmount(float damage, float missingHealth) {
         return damage <= 0 ? 0 : Math.min(missingHealth, Math.clamp(damage * 0.25F, 1, 4));
+    }
+
+    private static void pull(LivingEntity target, LivingEntity attacker) {
+        Vec3 toward = new Vec3(attacker.getX() - target.getX(), 0, attacker.getZ() - target.getZ());
+        if (toward.lengthSqr() < 1) return;
+        // Replaces the hit's knockback so the target moves toward the wielder instead of away.
+        target.setDeltaMovement(toward.normalize().scale(.8).add(0, .25, 0));
+        target.hurtMarked = true;
+    }
+
+    /** A visual-only bolt keeps the lightning on the target: no fire spread and no damage to the wielder. */
+    private static void strike(ServerLevel level, ServerPlayer attacker, LivingEntity target) {
+        var bolt = EntityTypes.LIGHTNING_BOLT.create(level, EntitySpawnReason.TRIGGERED);
+        if (bolt == null) return;
+        bolt.snapTo(target.position());
+        bolt.setVisualOnly(true);
+        bolt.setCause(attacker);
+        level.addFreshEntity(bolt);
+        target.thunderHit(level, bolt);
     }
 
     private static void explode(ServerLevel level, ServerPlayer attacker, LivingEntity target) {

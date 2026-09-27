@@ -64,7 +64,7 @@ Milestones follow 10, 25, 50, 100, 250, 500, and the same pattern at larger scal
 
 Initial requests ask for one ordinary result or two special results. Retries request up to five alternatives with validation guidance. Repeated invalid responses block the combination; connection failures do not. See [recipe storage and commands](engine.md) to inspect or reset a pair.
 
-Hit traits include `launching` (one second of levitation), `frostbite` (three seconds of Slowness I), and `revealing` (five seconds of glowing). Their item hints are Uplifting, Chilly, and Exposing.
+Hit traits include `launching` (one second of levitation), `frostbite` (three seconds of Slowness I), `revealing` (five seconds of glowing), `magnetic` (pulls the target toward the wielder) and `thundering` (a lightning strike on the target that spares the wielder and starts no fires). Their item hints are Uplifting, Chilly, Exposing, Magnetic and Stormy.
 
 `lucky` adds the Luck attribute (up to +2), or a Luck effect when consumed. Built-in chest, mob, archaeology and vault loot tables gain one bonus roll per pool for each point of luck; Unluck removes rolls. Fishing already uses luck. Without luck, loot is unchanged; datapack tables are left alone.
 
@@ -92,7 +92,7 @@ Nibbleable food uses vanilla food, consumption and durability components. The se
 
 The **Traits** settings tab lists every registered trait. Each toggle controls whether a trait can appear in new recipes; turning a combat trait off also stops its server-side triggers on existing items. Existing native attributes and food effects stay on items already created.
 
-**Chance** changes combat triggers immediately and eating effects on newly created outputs. Explosive uses a **Base chance**, rising with recent damage up to five times that value, capped at 100%. Its default remains 10–50%. Dedicated-server hosts can edit `disabledTraits` and `traitChances` in `config/infinitecraft.json`, then run `/fusion reload`.
+**Chance** changes combat triggers immediately and eating effects on newly created outputs. Explosive and thundering use a **Base chance**, rising with recent damage up to five times that value, capped at 100%. Defaults are 10–50% for explosive and 5–25% for thundering. Dedicated-server hosts can edit `disabledTraits` and `traitChances` in `config/infinitecraft.json`, then run `/fusion reload`.
 
 ### Favorites and crafter modes
 

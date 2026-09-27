@@ -69,6 +69,8 @@ public final class TraitRegistry {
             new TriggeredTrait("launching", "⬆ Uplifting", 0xB388FF),
             new TriggeredTrait("frostbite", "❄ Chilly", 0x55FFFF),
             new TriggeredTrait("revealing", "☀ Exposing", 0xFFFF55),
+            new TriggeredTrait("magnetic", "∩ Magnetic", 0x7FB2FF),
+            new TriggeredTrait("thundering", "☇ Stormy", 0x7DF9FF),
             new ReactiveArmorTrait("startled", "⚡ Jumpy", 0xC6FF3D,
                     "While worn, taking an attack grants Speed I for 3 seconds.", MobEffects.SPEED, 60, 1, false),
             new ReactiveArmorTrait("hardened", "⚓ Stubborn", 0xAAAAAA,

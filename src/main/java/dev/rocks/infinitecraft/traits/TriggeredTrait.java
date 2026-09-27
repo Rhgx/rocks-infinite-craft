@@ -7,7 +7,13 @@ import java.util.Set;
 
 /** A trait whose behavior is supplied by a server-side gameplay event. */
 record TriggeredTrait(String id, String hint, int hintColor) implements TraitDefinition {
-    @Override public float triggerChance() { return id.equals("explosive") ? .1F : 1; }
+    @Override public float triggerChance() {
+        return switch (id) {
+            case "explosive" -> .1F;
+            case "thundering" -> .05F;
+            default -> 1;
+        };
+    }
     @Override
     public String description() {
         return switch (id) {
@@ -17,6 +23,8 @@ record TriggeredTrait(String id, String hint, int hintColor) implements TraitDef
             case "launching" -> "Melee or projectile hits briefly levitate the target.";
             case "frostbite" -> "Melee or projectile hits briefly slow the target.";
             case "revealing" -> "Melee or projectile hits make the target glow through walls.";
+            case "magnetic" -> "Melee or projectile hits pull the target toward the wielder.";
+            case "thundering" -> "Melee or projectile hits can call lightning onto the target, more often after heavy damage.";
             default -> "";
         };
     }

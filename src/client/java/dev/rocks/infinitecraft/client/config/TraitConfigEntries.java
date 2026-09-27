@@ -36,13 +36,13 @@ final class TraitConfigEntries {
                 if (!TraitSettings.CHANCE_TRAITS.contains(trait.id())) continue;
 
                 int defaultChance = TraitSettings.defaultChance(trait.id());
-                boolean explosive = trait.id().equals("explosive");
-                section.add(entries.startIntSlider(Component.literal(explosive ? "  Base chance" : "  Chance")
+                boolean surging = trait.id().equals("explosive") || trait.id().equals("thundering");
+                section.add(entries.startIntSlider(Component.literal(surging ? "  Base chance" : "  Chance")
                                         .withStyle(ChatFormatting.GRAY),
                                 config.traitChances.getOrDefault(trait.id(), defaultChance), 0, 100)
                         .setDefaultValue(defaultChance)
                         .setTextGetter(value -> Component.literal(value + "%"))
-                        .setTooltip(Component.literal(explosive
+                        .setTooltip(Component.literal(surging
                                 ? "Increases with recent damage, up to five times this chance (maximum 100%)."
                                 : trait.phase() == TraitDefinition.Phase.FOOD
                                         ? "Applies to newly created food. Existing food keeps its chance."
@@ -62,7 +62,7 @@ final class TraitConfigEntries {
         if (trait.phase() == TraitDefinition.Phase.FOOD) return "Food";
         return switch (trait.id()) {
             case "strong", "attack_speed", "knockback", "sweeping", "explosive", "incendiary",
-                    "vampiric", "launching", "frostbite", "revealing" -> "Weapons";
+                    "vampiric", "launching", "frostbite", "revealing", "magnetic", "thundering" -> "Weapons";
             case "anchored", "armored", "tough", "healthy", "startled", "hardened", "cold_shoulder" -> "Armor";
             case "blocking", "gliding", "death_protection", "lucky_block" -> "Utility";
             default -> "Attributes";
