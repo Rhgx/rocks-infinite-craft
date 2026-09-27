@@ -61,6 +61,8 @@ public final class TraitRegistry {
                     () -> Attributes.WATER_MOVEMENT_EFFICIENCY, ADD),
             new AttributeTrait("step_up", new StrengthRange(0, 1, .5),
                     () -> Attributes.STEP_HEIGHT, ADD),
+            new AttributeTrait("lucky", new StrengthRange(0, 2, 1),
+                    () -> Attributes.LUCK, ADD, () -> MobEffects.LUCK),
             new TriggeredTrait("explosive", "☄ Volatile", 0xFF5555),
             new TriggeredTrait("incendiary", "🔥 Burning", 0xFF8C1A),
             new TriggeredTrait("vampiric", "♥ Bloodthirsty", 0xDC143C),

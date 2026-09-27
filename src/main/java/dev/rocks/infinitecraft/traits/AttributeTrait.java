@@ -50,6 +50,7 @@ public record AttributeTrait(
             case "sweeping" -> "Increase sweeping attack damage.";
             case "water_stride" -> "Move faster underwater.";
             case "step_up" -> "Step over taller obstacles.";
+            case "lucky" -> "Increase luck: extra rolls from chests, mob drops, archaeology, vaults and fishing.";
             default -> "";
         };
     }

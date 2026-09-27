@@ -30,6 +30,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.CrafterBlockEntity;
 import net.minecraft.world.level.storage.loot.functions.CopyComponentsFunction;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
+import net.minecraft.world.level.storage.loot.providers.number.ConstantValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -144,6 +145,10 @@ public final class InfiniteCraftMod implements ModInitializer {
                         .include(DataComponents.CUSTOM_MODEL_DATA)
                         .include(DataComponents.CUSTOM_NAME)
                         .include(DataComponents.LORE));
+            // Vanilla passes the player's luck here but its tables ignore it; each point of luck now adds a roll per pool.
+            String path = key.identifier().getPath();
+            if (source.isBuiltin() && (path.startsWith("chests/") || path.startsWith("entities/") || path.startsWith("archaeology/")))
+                builder.modifyPools(pool -> pool.setBonusRolls(ConstantValue.exactly(1)));
         });
         DiscoveryBook.initialize(player -> runtime == null ? List.of() : runtime.discoveries(player));
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {

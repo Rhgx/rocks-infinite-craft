@@ -66,6 +66,8 @@ Initial requests ask for one ordinary result or two special results. Retries req
 
 Hit traits include `launching` (one second of levitation), `frostbite` (three seconds of Slowness I), and `revealing` (five seconds of glowing). Their item hints are Uplifting, Chilly, and Exposing.
 
+`lucky` adds the Luck attribute (up to +2), or a Luck effect when consumed. Built-in chest, mob, archaeology and vault loot tables gain one bonus roll per pool for each point of luck; Unluck removes rolls. Fishing already uses luck. Without luck, loot is unchanged; datapack tables are left alone.
+
 Connection tests show elapsed seconds and can be cancelled. Debug logs include Ollama prompt/output timings and token counts, plus accepted recipe attempt counts and total generation time. These measurements exclude request bodies and API keys.
 
 Combat traits work on melee hits, bow and crossbow arrows, thrown tridents, snowballs, eggs and ender pearls. Arrows inherit both ammunition and firing-weapon traits, without applying duplicate traits twice. Thrown items use their own traits. Switching held items after firing does not change the shot. Zero-damage hits can trigger effects, but cannot grant lifesteal or increase the explosion chance.
