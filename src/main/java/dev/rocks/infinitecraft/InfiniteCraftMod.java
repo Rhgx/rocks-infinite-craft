@@ -10,6 +10,7 @@ import dev.rocks.infinitecraft.fusion.FusionCrafterBlock;
 import dev.rocks.infinitecraft.fusion.FusionRuntime;
 import dev.rocks.infinitecraft.traits.CombatTraits;
 import dev.rocks.infinitecraft.traits.LuckyBlockTrait;
+import dev.rocks.infinitecraft.traits.ToolTraits;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
@@ -113,6 +114,7 @@ public final class InfiniteCraftMod implements ModInitializer {
     @Override
     public void onInitialize() {
         CombatTraits.initialize();
+        ToolTraits.initialize();
         LuckyBlockTrait.initialize();
         SpecialItemsTab.initialize();
         DiscoveryScreenPayload.initialize();

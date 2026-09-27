@@ -64,7 +64,8 @@ final class TraitConfigEntries {
             case "strong", "attack_speed", "knockback", "sweeping", "explosive", "incendiary",
                     "vampiric", "launching", "frostbite", "revealing", "magnetic", "thundering" -> "Weapons";
             case "anchored", "armored", "tough", "healthy", "startled", "hardened", "cold_shoulder" -> "Armor";
-            case "blocking", "gliding", "death_protection", "lucky_block" -> "Utility";
+            case "blocking", "gliding", "death_protection", "lucky_block",
+                    "self_repairing", "auto_smelt", "vein_miner" -> "Utility";
             default -> "Attributes";
         };
     }

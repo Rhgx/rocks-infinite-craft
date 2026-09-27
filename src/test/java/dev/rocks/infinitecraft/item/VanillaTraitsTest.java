@@ -155,7 +155,9 @@ class VanillaTraitsTest {
         var ops = lookup.createSerializationContext(JsonOps.INSTANCE);
         for (String trait : VanillaTraits.ids()) for (String activation :
                 TraitRegistry.get(trait).activationModes()) {
-            var result = VanillaTraits.apply(new ItemStack(Items.STICK, 5), List.of(trait), "Test " + trait,
+            // Tool-only traits reject the stick fixture.
+            var item = TraitRegistry.get(trait).supports(new ItemStack(Items.STICK)) ? Items.STICK : Items.IRON_PICKAXE;
+            var result = VanillaTraits.apply(new ItemStack(item, 5), List.of(trait), "Test " + trait,
                     Map.of(), Map.of(trait, activation), new NameStyle("#55FF55", true, true));
             assertFalse(result.isEmpty(), trait);
             assertFalse(ItemDataFusion.prepare(new ItemStack(Items.STICK), result, new ItemStack(Items.COAL), false).isEmpty(), trait);
